@@ -1,7 +1,9 @@
 import pickle
 
 from networkx import MultiGraph
+from torch import optim
 
+from torch_autoneb.hyperparameters import CycleHyperparameters, Hyperparameters
 from torch_autoneb.suggest import suggest_pair
 try:
     from tqdm import tqdm as _tqdm
@@ -10,7 +12,9 @@ except ModuleNotFoundError:
         yield from iterable
 
 
-def find_minimum():
+def find_minimum(config: Hyperparameters):
+    optimiser = getattr(optim, config.optim_name)
+
     return {
         "coords": None,
         "value": 42,
@@ -24,7 +28,7 @@ def neb(minimum1, minimum2, previous_cycle_data):
     }
 
 
-def auto_neb(cycle_count, graph, suggest_engines):
+def auto_neb(config: CycleHyperparameters, graph, suggest_engines):
     while True:
         # Suggest new pair based on current graph
         m1, m2 = suggest_pair(graph, *suggest_engines)
@@ -42,7 +46,7 @@ def auto_neb(cycle_count, graph, suggest_engines):
             this_cycle_idx = 1
 
         # Run NEB and add to graph
-        assert this_cycle_idx <= cycle_count
+        assert this_cycle_idx <= config.cycle_count
         connection_data = neb(m1, m2, previous_cycle_data)
         graph.add_edge(m1, m2, key=this_cycle_idx, **connection_data)
 

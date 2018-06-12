@@ -3,6 +3,7 @@ import os
 from networkx import MultiGraph
 
 from torch_autoneb import auto_neb, load_pickle_graph, find_minimum, _tqdm
+from torch_autoneb.hyperparameters import Hyperparameters, CycleHyperparameters
 from torch_autoneb.suggest.all import all_suggest
 from torch_autoneb.suggest.disconnected import disconnected_suggest
 from torch_autoneb.suggest.mst import mst_suggest
@@ -14,6 +15,9 @@ def main():
     cycle_count = 14
     graph_file_name = "bliblablu.p"
     suggest_engines = [create_unfinished_suggest(cycle_count), disconnected_suggest, mst_suggest, all_suggest]
+    minimisation_hyperparameters = Hyperparameters()
+    auto_neb_hyperparameters = CycleHyperparameters(cycle_count)
+    model = ModelWrapper()
 
     # === Create graph ===
     if os.path.exists(graph_file_name):
@@ -23,13 +27,11 @@ def main():
 
     # === Ensure the specified number of minima ===
     for _ in _tqdm(range(len(graph.nodes), minima_count)):
-        minimum_data = find_minimum()
+        minimum_data = find_minimum(model, minimisation_hyperparameters)
         graph.add_node(max(graph.nodes) + 1, **minimum_data)
 
     # === Connect minima ordered by suggestion algorithm ===
-    auto_neb(cycle_count, graph, suggest_engines)
-
-    pass
+    auto_neb(model, auto_neb_hyperparameters, graph, suggest_engines)
 
 
 if __name__ == '__main__':
