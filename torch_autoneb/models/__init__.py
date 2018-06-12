@@ -4,6 +4,9 @@ import torch
 from functools import reduce
 
 from torch.nn import Module
+from torch.utils.data import DataLoader
+
+from torch_autoneb.hyperparameters import EvalHyperparameters
 
 
 class ModelWrapper:
@@ -89,7 +92,7 @@ class ModelWrapper:
             target[:] = self.coords.to(target.device)
             return target
 
-    def set_coords_no_grad(self, coords, copy=True, update_cache=True):
+    def set_coords_no_grad(self, coords, copy=True, update_model=True):
         self._check_device()
         coords = coords.to(self.device)
 
@@ -98,8 +101,50 @@ class ModelWrapper:
         else:
             self.coords = coords
 
-        if update_cache:
+        if update_model:
             self._coords_to_model()
 
-    def forward(self):
-        pass
+    def forward(self, gradient=False, **kwargs):
+        # Forward data -> loss
+        if gradient:
+            self.model.train()
+        else:
+            self.model.eval()
+        with torch.set_grad_enabled(gradient):
+            loss = self.model(**kwargs)
+
+        # Backpropation
+        if gradient:
+            loss.backward()
+
+
+class DataModel:
+    def __init__(self, model: Module, datasets: dict):
+        self.batch_size = None
+        self.model = model
+
+        self.datasets = datasets
+        self.dataset_loaders = {}
+        self.dataset_iters = {}
+
+    def adapt_to_config(self, config: EvalHyperparameters):
+        self.batch_size = config.batch_size
+
+    def forward(self, dataset="train", **kwargs):
+        while True:
+            if dataset not in self.dataset_iters:
+                if dataset not in self.dataset_loaders:
+                    # todo multi-threaded batch loading
+                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, True)
+                loader = self.dataset_loaders[dataset]
+                self.dataset_iters[dataset] = iter(loader)
+            iterator = self.dataset_iters[dataset]
+
+            try:
+                batch = next(iterator)
+                break
+            except StopIteration:
+                del self.dataset_iters[dataset]
+
+        data, target = batch
+        return self.model(data, target, **kwargs)
