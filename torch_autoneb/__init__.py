@@ -22,15 +22,13 @@ def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     model.initialise_randomly()
 
     # Optimise
-    with torch.set_grad_enabled(True):
-        for iteration in range(config.nsteps):
-            optimiser.zero_grad()
-            model.forward()
-            optimiser.step()
+    for iteration in range(config.nsteps):
+        optimiser.zero_grad()
+        model.forward()
+        optimiser.step()
 
     # Analyse
-    with torch.set_grad_enabled(False):
-        pass
+    pass
 
     return {
         "coords": None,

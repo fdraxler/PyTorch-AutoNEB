@@ -3,8 +3,10 @@ class EvalHyperparameters:
 
 
 class OptimHyperparameters:
-    optim_name = None
-    eval_hyperparameters = None
+    def __init__(self, nsteps, optim_name, optim_args):
+        self.nsteps = nsteps
+        self.optim_args = optim_args
+        self.optim_name = optim_name
 
 
 class NEBHyperparameters:
