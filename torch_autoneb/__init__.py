@@ -3,6 +3,11 @@ import pickle
 from networkx import MultiGraph
 
 from torch_autoneb.suggest import suggest_pair
+try:
+    from tqdm import tqdm as _tqdm
+except ModuleNotFoundError:
+    def _tqdm(iterable, *args, **kwargs):
+        yield from iterable
 
 
 def find_minimum():
