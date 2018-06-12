@@ -3,6 +3,7 @@ import operator
 import torch
 from functools import reduce
 
+from torch import Tensor
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
@@ -18,6 +19,7 @@ class ModelWrapper:
         super().__init__()
         self.model = model
         self.stored_parameters = self.model.parameters()
+        # noinspection PyProtectedMember
         self.stored_buffers = self.model._all_buffers()
         number_of_coords = sum(size for _, _, size, _ in self.iterate_params_buffers())
         self.device = self.stored_parameters[0].device
@@ -77,7 +79,15 @@ class ModelWrapper:
             final = final + size
         assert final == self.coords.shape[0]
 
-    def get_coords(self, target=None, copy=True, update_cache=True):
+    def get_coords(self, target: Tensor = None, copy: bool = True, update_cache: bool = True) -> Tensor:
+        """
+        Retrieve the coordinates of the current model.
+
+        :param target: If given, copy the data to this destination.
+        :param copy: Copy the data before returning it.
+        :param update_cache: Before copying, retrieve the current coordinates from the model. Set `False` if you are sure that they have been retrieved before.
+        :return: A tensor holding the coordinates.
+        """
         assert target is None or not copy, "Must copy if target is specified"
 
         if update_cache:
@@ -104,6 +114,15 @@ class ModelWrapper:
         if update_model:
             self._coords_to_model()
 
+    def adapt_to_config(self, config: EvalHyperparameters):
+        """
+        Adapts the model to hyperparameters, if supported.
+
+        :param config: The hyperparameters relevant for evaluating the model.
+        """
+        if hasattr(self.model, "adapt_to_config"):
+            self.model.adapt_to_config(config)
+
     def forward(self, gradient=False, **kwargs):
         # Forward data -> loss
         if gradient:
@@ -118,8 +137,10 @@ class ModelWrapper:
             loss.backward()
 
 
-class DataModel:
+class DataModel(Module):
     def __init__(self, model: Module, datasets: dict):
+        super().__init__()
+
         self.batch_size = None
         self.model = model
 
@@ -131,7 +152,9 @@ class DataModel:
         self.batch_size = config.batch_size
 
     def forward(self, dataset="train", **kwargs):
+        # Retrieve batch
         while True:
+            # Make sure that there is a non-empty iterator
             if dataset not in self.dataset_iters:
                 if dataset not in self.dataset_loaders:
                     # todo multi-threaded batch loading
@@ -146,5 +169,17 @@ class DataModel:
             except StopIteration:
                 del self.dataset_iters[dataset]
 
+        # Apply model on batch and use returned loss
         data, target = batch
         return self.model(data, target, **kwargs)
+
+
+class LossModel(Module):
+    def __init__(self, model: Module, loss: Module):
+        super().__init__()
+        self.model = model
+        self.loss = loss
+
+    def forward(self, data, target, **kwargs):
+        soft_pred = self.model(data, target)
+        return self.loss(soft_pred, target)
