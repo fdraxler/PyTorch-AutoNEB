@@ -1,29 +1,36 @@
 import operator
-
-from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, Softmax, LogSoftmax
-
-from torch_autoneb.helpers import ntuple
+from collections import Iterable, OrderedDict
 from functools import reduce
 
+from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, LogSoftmax, Module
 
-class MLP:
-    def __init__(self, depth, widths, input_size, batch_norm=True, dropout=0):
+from torch_autoneb.helpers import ntuple
+
+
+class MLP(Module):
+    def __init__(self, depth, widths, input_size, output_size, batch_norm=True, dropout=0):
+        super().__init__()
         widths = ntuple(widths, depth)
 
-        layers = []
-        previous_size = reduce(operator.mul, input_size)
+        layers = OrderedDict()
+        previous_size = reduce(operator.mul, input_size) if isinstance(input_size, Iterable) else input_size
         non_lin = ReLU()
         for i, width in enumerate(widths):
-            layer = [Linear(previous_size, width)]
+            layer = OrderedDict()
+            layer["linear"] = Linear(previous_size, width)
             previous_size = width
             if batch_norm:
-                layer.append(BatchNorm1d(width))
-            layer.append(non_lin)
+                layer["batch_norm"] = BatchNorm1d(width)
+            layer["non_lin"] = non_lin
             if dropout > 0:
-                layer.append(Dropout(float(dropout)))
-            layers.append(Sequential(layer))
+                layer["dropout"] = Dropout(float(dropout))
+            layers["layer_{i}".format(i=i)] = Sequential(layer)
         self.body = Sequential(layers)
+        self.final = Linear(previous_size, output_size)
         self.softmax = LogSoftmax()
 
     def forward(self, data):
-        return self.softmax(self.body(data))
+        data = self.body(data)
+        data = self.final(data)
+        data = self.softmax(data)
+        return data
