@@ -14,6 +14,8 @@ except ModuleNotFoundError:
     def _tqdm(iterable, *args, **kwargs):
         yield from iterable
 
+__all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph"]
+
 
 def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     optimiser = getattr(optim, config.optim_name)(model.model.parameters(), **config.optim_args)  # type: optim.Optimizer
@@ -24,22 +26,32 @@ def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     # Optimise
     for iteration in range(config.nsteps):
         optimiser.zero_grad()
-        model.forward()
+        model.forward(gradient=True)
         optimiser.step()
 
     # Analyse
     pass
 
     return {
-        "coords": None,
+        "coords": model.get_coords(),
         "value": 42,
     }
 
 
 def neb(m1, m2, previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) -> dict:
-    # Initialise
+    # Model and optimiser
+    neb = NEB(model)
+    optim_config = config.optim_config
+    optimiser = getattr(optim, optim_config.optim_name)(neb.path_coords, **optim_config.optim_args)  # type: optim.Optimizer
+
+    # Initialise chain
+    pass
 
     # Optimise
+    for iteration in range(optim_config.nsteps):
+        optimiser.zero_grad()
+        neb.forward(gradient=True)
+        optimiser.step()
 
     # Analyse
 

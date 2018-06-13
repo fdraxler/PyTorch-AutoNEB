@@ -3,14 +3,16 @@ class EvalHyperparameters:
 
 
 class OptimHyperparameters:
-    def __init__(self, nsteps, optim_name, optim_args):
+    def __init__(self, nsteps, optim_name, optim_args, eval_config: EvalHyperparameters):
         self.nsteps = nsteps
         self.optim_args = optim_args
         self.optim_name = optim_name
+        self.eval_config = eval_config
 
 
 class NEBHyperparameters:
-    def __init__(self, optim_config: OptimHyperparameters):
+    def __init__(self, spring_constant: float, optim_config: OptimHyperparameters):
+        self.spring_constant = spring_constant
         self.optim_config = optim_config
 
 
