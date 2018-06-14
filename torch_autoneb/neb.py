@@ -1,16 +1,19 @@
 from itertools import chain
 
-from torch import Tensor
+from torch import Tensor, zeros
 
 from torch_autoneb.hyperparameters import NEBHyperparameters
 from torch_autoneb.helpers import fast_inter_distance
-from torch_autoneb.models import ModelWrapper
+from torch_autoneb.models import ModelWrapper, ModelInterface
 
 
-class NEB:
-    def __init__(self, model: ModelWrapper, path_coords: Tensor):
+class NEB(ModelInterface):
+    def __init__(self, model: ModelWrapper, nimages: int, target_distances: Tensor = None):
         self.model = model
-        self.path_coords = path_coords
+        self.path_coords = zeros(nimages)
+        self.path_coords.grad = zeros(nimages)
+        self.target_distances = target_distances
+        self.spring_constant = 0
 
     def adapt_to_config(self, config: NEBHyperparameters):
         """
@@ -19,9 +22,69 @@ class NEB:
         :param config: The hyperparameters relevant for evaluating the model.
         """
         self.model.adapt_to_config(config.optim_config.eval_config)
+        self.spring_constant = config.spring_constant
 
-    def forward(self, gradient=False):
-        raise NotImplementedError
+    def forward(self, gradient=False, **kwargs):
+        npivots = self.path_coords.shape[0]
+        losses = self.path_coords.new(npivots)
+
+        # Redistribute if spring_constant == inf
+        assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
+        if gradient and self.spring_constant == float("inf"):
+            self.path_coords[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances)
+
+        # Compute losses (and gradients)
+        for i in range(npivots):
+            self.model.set_coords_no_grad(self.path_coords[i], copy=False)
+            losses[i] = self.model.forward(gradient and (0 < i < npivots))
+            if gradient and (0 < i < npivots):
+                # If the coordinates were modified, move them back to the cache
+                # The cache has the same storage as above
+                self.path_coords[i] = self.model.get_coords(update_cache=True)
+                self.path_coords.grad[i] = self.model.get_grad(update_cache=False)
+            else:
+                # Make sure no gradient is there
+                self.path_coords.grad[i].zero_()
+
+        # Compute NEB gradients as in (Henkelmann & Jonsson, 2000)
+        if gradient:
+            distances = fast_inter_distance(self.path_coords)
+            for i in range(1, npivots - 1):
+                d_prev, d_next = distances[i - 1:i + 1]
+                td_prev, td_next = self.target_distances[i - 1:i + 1]
+                l_prev, loss, l_next = losses[i - 1:i + 2]
+
+                # Compute tangent
+                tangent = self.compute_tangent(d_next, d_prev, i, l_next, l_prev, loss)
+
+                # Project gradients perpendicular to tangent
+                self.path_coords.grad[i] -= self.path_coords.grad[i].dot(tangent) * tangent
+
+                if self.spring_constant < float("inf"):
+                    # Spring force parallel to tangent
+                    self.path_coords.grad[i] += (d_prev - td_prev) - (d_next - td_next) * self.spring_constant * tangent
+
+        return losses.max()
+
+    def compute_tangent(self, d_next, d_prev, i, l_next, l_prev, loss):
+        if l_prev < loss > l_next or l_prev > loss < l_next:
+            # Interpolate tangent at maxima/minima to make convergence smooth
+            t_prev = (self.path_coords[i] - self.path_coords[i - 1]) / d_prev
+            t_next = (self.path_coords[i + 1] - self.path_coords[i]) / d_next
+            l_max = max(abs(loss - l_prev), abs(loss - l_next))
+            l_min = min(abs(loss - l_prev), abs(loss - l_next))
+            l_max /= l_max + l_min
+            l_min /= l_max + l_min
+            if l_prev > l_next:
+                return l_min * t_prev + l_max * t_next
+            else:
+                return l_max * t_prev + l_min * t_next
+        elif l_prev > l_next:
+            # Tangent to the previous
+            return (self.path_coords[i] - self.path_coords[i - 1]) / d_prev
+        else:
+            # Tangent to the next
+            return (self.path_coords[i + 1] - self.path_coords[i]) / d_next
 
 
 def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):
@@ -70,7 +133,7 @@ def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: T
         return new_chain, None
 
 
-def distribute_by_weights(path, nimages, path_target=None, weights=None, climbing_pivots=None):
+def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None, weights: Tensor = None, climbing_pivots: list = None):
     """
     Redistribute the pivots on the path so that they are spaced as given by the weights.
     """

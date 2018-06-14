@@ -10,7 +10,18 @@ from torch.utils.data import DataLoader
 from torch_autoneb.hyperparameters import EvalHyperparameters
 
 
-class ModelWrapper:
+class ModelInterface:
+    def get_device(self):
+        raise NotImplementedError
+
+    def to(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def forward(self, gradient=False, **kwargs):
+        raise NotImplementedError
+
+
+class ModelWrapper(ModelInterface):
     """
     Wraps around models which should return a loss for a given input batch.
     """
@@ -23,7 +34,7 @@ class ModelWrapper:
         self.stored_buffers = self.model._all_buffers()
         number_of_coords = sum(size for _, _, size, _ in self.iterate_params_buffers())
         self.device = self.stored_parameters[0].device
-        self.coords = torch.FloatTensor(number_of_coords).to(self.device).zero_()
+        self.coords = torch.empty(number_of_coords, dtype=torch.float32).to(self.device).zero_()
         self.coords.grad = self.coords.copy().zero_()
 
     def get_device(self):
@@ -97,9 +108,32 @@ class ModelWrapper:
             if copy:
                 return self.coords.copy()
             else:
-                return self.coords
+                return self.coords.detach()
         else:
             target[:] = self.coords.to(target.device)
+            return target
+
+    def get_grad(self, target: Tensor = None, copy: bool = True, update_cache: bool = True):
+        """
+        Retrieve the gradient of the current model.
+
+        :param target:
+        :param copy:
+        :param update_cache:
+        :return:
+        """
+        assert target is None or not copy, "Must copy if target is specified"
+
+        if update_cache:
+            self._coords_to_cache()
+
+        if target is None:
+            if copy:
+                return self.coords.grad.copy()
+            else:
+                return self.coords.grad.detach()
+        else:
+            target[:] = self.coords.grad.to(target.device)
             return target
 
     def set_coords_no_grad(self, coords, copy=True, update_model=True):
