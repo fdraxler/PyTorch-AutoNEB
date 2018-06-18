@@ -1,17 +1,18 @@
 from itertools import chain
 
-from torch import Tensor, zeros
+from torch import Tensor
 
-from torch_autoneb.hyperparameters import NEBHyperparameters
 from torch_autoneb.helpers import fast_inter_distance
+from torch_autoneb.hyperparameters import NEBHyperparameters
 from torch_autoneb.models import ModelWrapper, ModelInterface
 
 
 class NEB(ModelInterface):
-    def __init__(self, model: ModelWrapper, nimages: Tensor, target_distances: Tensor = None):
+    def __init__(self, model: ModelWrapper, path_coords: Tensor, target_distances: Tensor = None):
         self.model = model
-        self.path_coords = zeros(nimages, model.number_of_dimensions)
-        self.path_coords.grad = zeros(nimages, model.number_of_dimensions)
+        self.path_coords = path_coords.clone()
+        self.path_coords.requires_grad_()
+        self.path_coords.grad = path_coords.clone().zero_()
         self.target_distances = target_distances
         self.spring_constant = 0
 
@@ -117,7 +118,6 @@ def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: T
     new_count = sum(map(len, insert_alphass)) + existing_count
     new_chain = existing_chain.new(new_count, *existing_chain.shape[1:])
     if relative_lengths is not None:
-        # noinspection PyUnboundLocalVariable
         new_relative_lengths = relative_lengths.new(new_count - 1)
 
     # Fill first position
@@ -128,7 +128,6 @@ def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: T
         start = existing_chain[i]
         stop = existing_chain[i + 1]
         if relative_lengths is not None:
-            # noinspection PyUnboundLocalVariable
             section_weight = relative_lengths[i]
 
         last_alpha = 0

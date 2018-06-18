@@ -1,6 +1,7 @@
 import torch
 
 from torch_autoneb.fill import Fill
+from torch_autoneb.neb import fill_chain
 
 
 class FillEqual(Fill):
@@ -9,7 +10,7 @@ class FillEqual(Fill):
     """
 
     def fill(self, path_coords, insert_count, weights, transition_data):
-        return PyTorchNEB.fill_chain(path_coords, [torch.linspace(0, 1, insert_count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
+        return fill_chain(path_coords, [torch.linspace(0, 1, insert_count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
 
     def __repr__(self):
         return "equal"

@@ -1,18 +1,24 @@
-from networkx import Graph
+from logging import Logger
+
+from networkx import MultiGraph
 from networkx import connected_components
 
 
-def disconnected_suggest(graph):
+def disconnected_suggest(graph: MultiGraph, value_key, weight_key, logger: Logger):
     """
-    Parameters
-    ----------
-    graph : Graph
+    Find minima that are not connected to the global minimum.
+
+    :param graph:
+    :param value_key:
+    :param weight_key:
+    :param logger:
+    :return:
     """
     # Find the connected components
     subgraphs = list(connected_components(graph))
     if len(subgraphs) > 1:
         # Find the global minimum in the graph
-        minimum = min(graph, key=lambda x: graph.nodes[x]["value"])
+        minimum = min(graph, key=lambda x: graph.nodes[x][value_key])
 
         # Find the cluster of the global minimum
         minimum_subgraph = None
@@ -27,8 +33,8 @@ def disconnected_suggest(graph):
         smallest_value = float("inf")
         for subgraph in subgraphs:
             if subgraph is not minimum_subgraph:
-                submin = min(subgraph, key=lambda x: graph.nodes[x]["value"])
-                submin_value = graph.nodes[submin]["value"]
+                submin = min(subgraph, key=lambda x: graph.nodes[x][value_key])
+                submin_value = graph.nodes[submin][value_key]
                 if submin_value < smallest_value:
                     smallest_unconnected = submin
                     smallest_value = submin_value

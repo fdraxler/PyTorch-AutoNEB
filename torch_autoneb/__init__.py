@@ -1,7 +1,7 @@
 import pickle
 
 import torch
-from networkx import MultiGraph
+from networkx import MultiGraph, Graph
 from torch import optim
 
 from torch_autoneb.hyperparameters import NEBHyperparameters, OptimHyperparameters, AutoNEBHyperparameters, LandscapeExplorationHyperparameters
@@ -52,7 +52,7 @@ def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     return result
 
 
-def neb(m1, m2, previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) -> dict:
+def neb(previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) -> dict:
     # Initialise chain
     previous_path_coords = previous_cycle_data["path_coords"]
     previous_target_distances = previous_cycle_data["target_distances"]
@@ -88,7 +88,7 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHype
         start_cycle_idx = previous_cycle_idx + 1
     else:
         previous_cycle_data = {
-            "path_coords": torch.cat([graph.nodes[m]["coords"] for m in (m1, m2)]),
+            "path_coords": torch.cat([graph.nodes[m]["coords"].view(1, -1) for m in (m1, m2)]),
             "target_distances": torch.ones(1)
         }
         start_cycle_idx = 1
@@ -110,6 +110,25 @@ def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: Landsc
                 break
             auto_neb(m1, m2, graph, model, config.auto_neb_config)
             bar.update()
+
+
+def to_simple_graph(graph: MultiGraph, weight_key: str) -> Graph:
+    """
+    Reduce the MultiGraph to a simple graph by reducing each multi-edge
+    to its lowest container.
+    """
+    simple_graph = Graph()
+    for node in graph:
+        simple_graph.add_node(node, **graph.nodes[node])
+
+    for m1 in graph:
+        for m2 in graph[m1]:
+            best_edge_key = min(graph[m1][m2], key=lambda key: graph[m1][m2][key][weight_key])
+            best_edge_data = graph[m1][m2][best_edge_key]
+            best_edge_data["cycle_idx"] = best_edge_key
+            simple_graph.add_edge(m1, m2, **best_edge_data)
+
+    return simple_graph
 
 
 def load_pickle_graph(graph_file_name) -> MultiGraph:
