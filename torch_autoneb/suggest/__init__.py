@@ -1,9 +1,9 @@
 from networkx import MultiGraph
 
 
-def suggest_pair(graph: MultiGraph, *engines, logger=None):
+def suggest_pair(graph: MultiGraph, value_key: str, weight_key: str, *engines, logger=None):
     for engine in engines:
-        m1, m2 = engine(graph)
+        m1, m2 = engine(graph, value_key, weight_key)
         if m1 is None or m2 is None:
             assert m1 is None and m2 is None
         else:

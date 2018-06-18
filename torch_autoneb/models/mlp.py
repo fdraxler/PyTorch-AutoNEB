@@ -27,7 +27,7 @@ class MLP(Module):
             layers["layer_{i}".format(i=i)] = Sequential(layer)
         self.body = Sequential(layers)
         self.final = Linear(previous_size, output_size)
-        self.softmax = LogSoftmax()
+        self.softmax = LogSoftmax(dim=1)
 
     def forward(self, data):
         data = self.body(data)

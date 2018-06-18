@@ -1,9 +1,11 @@
 import operator
+from math import sqrt
 
 import torch
 from functools import reduce
 
 from torch import Tensor
+from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
@@ -17,8 +19,40 @@ class ModelInterface:
     def to(self, *args, **kwargs):
         raise NotImplementedError
 
-    def forward(self, gradient=False, **kwargs):
+    def apply(self, gradient=False, **kwargs):
         raise NotImplementedError
+
+    def parameters(self):
+        raise NotImplementedError
+
+
+def param_init(mod: Module):
+    if isinstance(mod, nn.Linear):
+        n = mod.in_features
+        mod.weight.data.normal_(0, 1. / sqrt(n))
+        if mod.bias is not None:
+            mod.bias.data.zero_()
+    elif isinstance(mod, (nn.Conv2d, nn.ConvTranspose2d)):
+        n = mod.in_channels
+        for k in mod.kernel_size:
+            n *= k
+        mod.weight.data.normal_(0, 1. / sqrt(n))
+        if mod.bias is not None:
+            mod.bias.data.zero_()
+    elif isinstance(mod, (nn.Conv3d, nn.ConvTranspose3d)):
+        n = mod.in_channels
+        for k in mod.kernel_size:
+            n *= k
+        mod.weight.data.normal_(0, 1. / sqrt(n))
+        if mod.bias is not None:
+            mod.bias.data.zero_()
+    elif isinstance(mod, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+        mod.reset_parameters()
+    elif len(mod._parameters) == 0:
+        # Module has no parameters on its own
+        pass
+    else:
+        print("Don't know how to initialise %s" % mod.__class__.__name__)
 
 
 class ModelWrapper(ModelInterface):
@@ -29,19 +63,26 @@ class ModelWrapper(ModelInterface):
     def __init__(self, model: Module):
         super().__init__()
         self.model = model
-        self.stored_parameters = self.model.parameters()
+        self.stored_parameters = list(self.model.parameters())
         # noinspection PyProtectedMember
         self.stored_buffers = self.model._all_buffers()
-        number_of_coords = sum(size for _, _, size, _ in self.iterate_params_buffers())
-        self.device = self.stored_parameters[0].device
-        self.coords = torch.empty(number_of_coords, dtype=torch.float32).to(self.device).zero_()
-        self.coords.grad = self.coords.copy().zero_()
+        self.number_of_dimensions = sum(size for _, _, size, _ in self.iterate_params_buffers())
+        device = self.stored_parameters[0].device
+        self.coords = torch.empty(self.number_of_dimensions, dtype=torch.float32).to(device).zero_()
+        self.coords.grad = self.coords.clone().zero_()
 
     def get_device(self):
-        return self.device
+        return self.coords.device
 
     def to(self, *args, **kwargs):
         self.model.to(*args, **kwargs)
+        self._check_device()
+
+    def parameters(self):
+        return self.model.parameters()
+
+    def initialise_randomly(self):
+        self.model.apply(param_init)
 
     def iterate_params_buffers(self):
         offset = 0
@@ -56,9 +97,9 @@ class ModelWrapper(ModelInterface):
             offset += size
 
     def _check_device(self):
-        self.device = self.stored_parameters[0].device
-        if self.device != self.coords.device:
-            self.coords = self.coords.to(self.device)
+        new_device = self.stored_parameters[0].device
+        if self.coords.device != self.coords.device:
+            self.coords.to(new_device)
 
     def _coords_to_model(self):
         self._check_device()
@@ -106,7 +147,7 @@ class ModelWrapper(ModelInterface):
 
         if target is None:
             if copy:
-                return self.coords.copy()
+                return self.coords.clone()
             else:
                 return self.coords.detach()
         else:
@@ -138,7 +179,7 @@ class ModelWrapper(ModelInterface):
 
     def set_coords_no_grad(self, coords, copy=True, update_model=True):
         self._check_device()
-        coords = coords.to(self.device)
+        coords = coords.to(self.coords.device)
 
         if copy:
             self.coords[:] = coords
@@ -157,7 +198,7 @@ class ModelWrapper(ModelInterface):
         if hasattr(self.model, "adapt_to_config"):
             self.model.adapt_to_config(config)
 
-    def forward(self, gradient=False, **kwargs):
+    def apply(self, gradient=False, **kwargs):
         # Forward data -> loss
         if gradient:
             self.model.train()
@@ -169,6 +210,11 @@ class ModelWrapper(ModelInterface):
         # Backpropation
         if gradient:
             loss.backward()
+        return loss
+
+    def analyse(self):
+        self.model.eval()
+        return self.model.analyse()
 
 
 class DataModel(Module):
@@ -204,16 +250,45 @@ class DataModel(Module):
                 del self.dataset_iters[dataset]
 
         # Apply model on batch and use returned loss
-        data, target = batch
-        return self.model(data, target, **kwargs)
+        device = list(self.model.parameters())[0].device
+        return self.model(*[item.to(device) for item in batch], **kwargs)
+
+    def analyse(self):
+        # Go through all data points and accumulate stats
+        analysis = {}
+        for ds_name, dataset in self.datasets.items():
+            ds_length = len(dataset)
+            for batch in DataLoader(dataset, self.batch_size):
+                result = self.model.analyse(*batch)
+                for key, value in result.items():
+                    ds_key = f"{ds_name}_{key}"
+                    if key not in analysis:
+                        analysis[ds_key] = 0
+                    analysis[ds_key] += value * batch[0].shape[0] / ds_length
+        return analysis
 
 
-class LossModel(Module):
+class CompareModel(Module):
+    ERROR = "error"
+    ERROR_5 = "error_5"
+    LOSS = "loss"
+
     def __init__(self, model: Module, loss: Module):
         super().__init__()
         self.model = model
         self.loss = loss
 
     def forward(self, data, target, **kwargs):
-        soft_pred = self.model(data, target)
+        soft_pred = self.model(data, **kwargs)
         return self.loss(soft_pred, target)
+
+    def analyse(self, data, target):
+        # Compute some statistics over the given batch
+        soft_pred = self.model(data)
+        hard_pred = soft_pred.data.sort(1, True)[1]
+
+        hard_pred_correct = hard_pred[:].eq(target.data.view(-1, 1)).cumsum(1)
+        return {
+            CompareModel.ERROR: 1 - hard_pred_correct[:, 0].float().mean(),
+            CompareModel.LOSS: self.loss(soft_pred, target),
+        }

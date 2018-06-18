@@ -1,6 +1,3 @@
-import torch
-
-
 class Fill:
     def fill(self, path_coords, insert_count, weights, transition_data):
         """
@@ -19,7 +16,7 @@ class Fill:
 
         Returns
         -------
-        torch.FloatTensor, torch.FloatTensor
+        torch.Tensor, torch.Tensor
             The new coordinates and new relative target distances.
         """
         raise NotImplementedError

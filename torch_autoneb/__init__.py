@@ -6,57 +6,75 @@ from torch import optim
 
 from torch_autoneb.hyperparameters import NEBHyperparameters, OptimHyperparameters, AutoNEBHyperparameters, LandscapeExplorationHyperparameters
 from torch_autoneb.models import ModelWrapper
+from torch_autoneb.neb import NEB
 from torch_autoneb.suggest import suggest_pair
 
 try:
-    from tqdm import tqdm as _tqdm
+    from tqdm import tqdm as pbar
 except ModuleNotFoundError:
-    def _tqdm(iterable, *args, **kwargs):
-        yield from iterable
+    class pbar:
+        def __init__(self, iterable=None, desc=None, total=None, *args, **kwargs):
+            self.iterable = iterable
+
+        def __iter__(self):
+            yield from self.iterable
+
+        def __enter__(self):
+            pass
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        def update(self, N=None):
+            pass
 
 __all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph"]
 
 
 def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
-    optimiser = getattr(optim, config.optim_name)(model.model.parameters(), **config.optim_args)  # type: optim.Optimizer
+    optimiser = getattr(optim, config.optim_name)(model.parameters(), **config.optim_args)  # type: optim.Optimizer
 
     # Initialise
     model.initialise_randomly()
+    model.adapt_to_config(config.eval_config)
 
     # Optimise
-    for iteration in range(config.nsteps):
+    for _ in pbar(range(config.nsteps), "Find mimimum"):
         optimiser.zero_grad()
-        model.forward(gradient=True)
+        model.apply(gradient=True)
         optimiser.step()
+    result = {
+        "coords": model.get_coords(),
+    }
 
     # Analyse
-    pass
-
-    return {
-        "coords": model.get_coords(),
-        "value": 42,
-    }
+    result.update(model.analyse())
+    return result
 
 
 def neb(m1, m2, previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) -> dict:
-    # Model and optimiser
-    neb = NEB(model)
-    optim_config = config.optim_config
-    optimiser = getattr(optim, optim_config.optim_name)(neb.path_coords, **optim_config.optim_args)  # type: optim.Optimizer
-
     # Initialise chain
-    pass
+    previous_path_coords = previous_cycle_data["path_coords"]
+    previous_target_distances = previous_cycle_data["target_distances"]
+    start_path, target_distances = config.fill_method.fill(previous_path_coords, config.insert_count, previous_target_distances, previous_cycle_data)
+
+    # Model and optimiser
+    neb_model = NEB(model, start_path, target_distances)
+    optim_config = config.optim_config
+    optimiser = getattr(optim, optim_config.optim_name)(neb_model.parameters(), **optim_config.optim_args)  # type: optim.Optimizer
 
     # Optimise
-    for iteration in range(optim_config.nsteps):
-        optimiser.zero_grad()
-        neb.forward(gradient=True)
+    for _ in pbar(range(optim_config.nsteps), "NEB"):
+        # optimiser.zero_grad()  # has no effect, is overwritten anyway
+        neb_model.apply(gradient=True)
         optimiser.step()
 
     # Analyse
+    pass
 
     return {
-        "path_coords": None,
+        "path_coords": neb_model.path_coords,
+        "target_distances": target_distances,
         "weight": 42 + 3.14,
     }
 
@@ -69,24 +87,29 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHype
         previous_cycle_data = existing_edges[m1][m2][previous_cycle_idx]
         start_cycle_idx = previous_cycle_idx + 1
     else:
-        previous_cycle_data = None
+        previous_cycle_data = {
+            "path_coords": torch.cat([graph.nodes[m]["coords"] for m in (m1, m2)]),
+            "target_distances": torch.ones(1)
+        }
         start_cycle_idx = 1
     assert start_cycle_idx <= config.cycle_count
 
     # Run NEB and add to graph
-    for cycle_idx in range(start_cycle_idx, config.cycle_count + 1):
+    for cycle_idx in pbar(range(start_cycle_idx, config.cycle_count + 1)):
         cycle_config = config.hyperparameter_sets[start_cycle_idx - 1]
         connection_data = neb(m1, m2, previous_cycle_data, model, cycle_config)
         graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
 
 
 def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: LandscapeExplorationHyperparameters):
-    while True:
-        # Suggest new pair based on current graph
-        m1, m2 = suggest_pair(graph, *config.suggest_engines)
-        if m1 is None or m2 is None:
-            break
-        auto_neb(m1, m2, graph, model, config.auto_neb_config)
+    with pbar(desc="Landscape Exploration") as bar:
+        while True:
+            # Suggest new pair based on current graph
+            m1, m2 = suggest_pair(graph, config.value_key, config.weight_key, *config.suggest_engines)
+            if m1 is None or m2 is None:
+                break
+            auto_neb(m1, m2, graph, model, config.auto_neb_config)
+            bar.update()
 
 
 def load_pickle_graph(graph_file_name) -> MultiGraph:
@@ -96,10 +119,4 @@ def load_pickle_graph(graph_file_name) -> MultiGraph:
         # Check file structure
         if not isinstance(graph, MultiGraph):
             raise ValueError(f"{graph_file_name} does not contain a nx.MultiGraph")
-        for node in graph.nodes:
-            if not "value" in graph.nodes[node]:
-                raise ValueError(f"{graph_file_name} does not contain a 'value' property for node {node}.")
-        for edge in graph.edges:
-            if not "weight" in graph.get_edge_data(*edge):
-                raise ValueError(f"{graph_file_name} does not contain a 'weight' property for edge from {edge[0]} to {edge[1]} (cycle {edge[2]}).")
     return graph

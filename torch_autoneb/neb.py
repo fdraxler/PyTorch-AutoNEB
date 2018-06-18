@@ -8,12 +8,27 @@ from torch_autoneb.models import ModelWrapper, ModelInterface
 
 
 class NEB(ModelInterface):
-    def __init__(self, model: ModelWrapper, nimages: int, target_distances: Tensor = None):
+    def __init__(self, model: ModelWrapper, nimages: Tensor, target_distances: Tensor = None):
         self.model = model
-        self.path_coords = zeros(nimages)
-        self.path_coords.grad = zeros(nimages)
+        self.path_coords = zeros(nimages, model.number_of_dimensions)
+        self.path_coords.grad = zeros(nimages, model.number_of_dimensions)
         self.target_distances = target_distances
         self.spring_constant = 0
+
+    def get_device(self):
+        return self.path_coords.device
+
+    def to(self, *args, **kwargs):
+        self.model.to(*args, **kwargs)
+        self._check_device()
+
+    def _check_device(self):
+        new_device = self.model.stored_parameters[0].device
+        if new_device != self.path_coords.device:
+            self.path_coords = self.path_coords.to(new_device)
+
+    def parameters(self):
+        return [self.path_coords]
 
     def adapt_to_config(self, config: NEBHyperparameters):
         """
@@ -24,7 +39,7 @@ class NEB(ModelInterface):
         self.model.adapt_to_config(config.optim_config.eval_config)
         self.spring_constant = config.spring_constant
 
-    def forward(self, gradient=False, **kwargs):
+    def apply(self, gradient=False, **kwargs):
         npivots = self.path_coords.shape[0]
         losses = self.path_coords.new(npivots)
 
@@ -36,7 +51,7 @@ class NEB(ModelInterface):
         # Compute losses (and gradients)
         for i in range(npivots):
             self.model.set_coords_no_grad(self.path_coords[i], copy=False)
-            losses[i] = self.model.forward(gradient and (0 < i < npivots))
+            losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):
                 # If the coordinates were modified, move them back to the cache
                 # The cache has the same storage as above
