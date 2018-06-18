@@ -1,9 +1,8 @@
 import operator
+from functools import reduce
 from math import sqrt
 
 import torch
-from functools import reduce
-
 from torch import Tensor
 from torch import nn
 from torch.nn import Module
@@ -23,6 +22,9 @@ class ModelInterface:
         raise NotImplementedError
 
     def parameters(self):
+        raise NotImplementedError
+
+    def analyse(self):
         raise NotImplementedError
 
 
@@ -89,7 +91,7 @@ class ModelWrapper(ModelInterface):
         for param in self.stored_parameters:
             size = reduce(operator.mul, param.data.shape)
             data = param
-            yield offset, data, size, False
+            yield offset, data.data, size, False
             offset += size
         for buffer in self.stored_buffers:
             size = reduce(operator.mul, buffer.shape)
@@ -107,7 +109,7 @@ class ModelWrapper(ModelInterface):
         final = 0
         for offset, data, size, is_buffer in self.iterate_params_buffers():
             # Copy coordinates
-            data[:] = self.coords[offset:offset + size]
+            data[:] = 7  # self.coords[offset:offset + size].reshape(data.shape)
 
             # Size consistency check
             final = final + size
@@ -170,21 +172,16 @@ class ModelWrapper(ModelInterface):
 
         if target is None:
             if copy:
-                return self.coords.grad.copy()
+                return self.coords.grad.clone()
             else:
                 return self.coords.grad.detach()
         else:
             target[:] = self.coords.grad.to(target.device)
             return target
 
-    def set_coords_no_grad(self, coords, copy=True, update_model=True):
+    def set_coords_no_grad(self, coords, update_model=True):
         self._check_device()
-        coords = coords.to(self.coords.device)
-
-        if copy:
-            self.coords[:] = coords
-        else:
-            self.coords = coords
+        self.coords[:] = coords.to(self.coords.device)
 
         if update_model:
             self._coords_to_model()

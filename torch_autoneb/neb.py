@@ -51,11 +51,10 @@ class NEB(ModelInterface):
 
         # Compute losses (and gradients)
         for i in range(npivots):
-            self.model.set_coords_no_grad(self.path_coords[i], copy=False)
+            self.model.set_coords_no_grad(self.path_coords[i])
             losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):
                 # If the coordinates were modified, move them back to the cache
-                # The cache has the same storage as above
                 self.path_coords[i] = self.model.get_coords(update_cache=True)
                 self.path_coords.grad[i] = self.model.get_grad(update_cache=False)
             else:
@@ -101,6 +100,9 @@ class NEB(ModelInterface):
         else:
             # Tangent to the next
             return (self.path_coords[i + 1] - self.path_coords[i]) / d_next
+
+    def analyse(self):
+        pass
 
 
 def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):

@@ -68,15 +68,14 @@ def neb(previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) ->
         # optimiser.zero_grad()  # has no effect, is overwritten anyway
         neb_model.apply(gradient=True)
         optimiser.step()
+    result = {
+        "path_coords": neb_model.path_coords.detach().clone(),
+        "target_distances": target_distances
+    }
 
     # Analyse
-    pass
-
-    return {
-        "path_coords": neb_model.path_coords,
-        "target_distances": target_distances,
-        "weight": 42 + 3.14,
-    }
+    result.update(neb_model.analyse())
+    return result
 
 
 def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHyperparameters):
