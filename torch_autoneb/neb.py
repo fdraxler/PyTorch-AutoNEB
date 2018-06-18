@@ -1,7 +1,8 @@
 from itertools import chain
 
-from torch import Tensor
+from torch import Tensor, linspace
 
+from torch_autoneb import pbar
 from torch_autoneb.helpers import fast_inter_distance
 from torch_autoneb.hyperparameters import NEBHyperparameters
 from torch_autoneb.models import ModelWrapper, ModelInterface
@@ -101,8 +102,41 @@ class NEB(ModelInterface):
             # Tangent to the next
             return (self.path_coords[i + 1] - self.path_coords[i]) / d_next
 
-    def analyse(self):
-        pass
+    def analyse(self, sub_pivot_count=9):
+        # Collect stats here
+        analysis = {}
+
+        dense_pivot_count = (self.path_coords.shape[0] - 1) * (sub_pivot_count + 1) + 1
+        alphas = linspace(0, 1, sub_pivot_count + 2)[:-1]
+        for i in pbar(range(dense_pivot_count), "Saddle analysis"):
+            base_pivot = i // (sub_pivot_count + 1)
+            sub_pivot = i % (sub_pivot_count + 1)
+
+            if sub_pivot == 0:
+                # Coords of pivot
+                coords = self.path_coords[base_pivot]
+            else:
+                # Or interpolation between pivots
+                alpha = alphas[sub_pivot]
+                coords = self.path_coords[base_pivot] * (1 - alpha) + self.path_coords[base_pivot + 1] * alpha
+
+            # Retrieve values from model analysis
+            self.model.set_coords_no_grad(coords)
+            point_analysis = self.model.analyse()
+            for key, value in point_analysis.items():
+                dense_key = "dense_" + key
+                if dense_key not in analysis:
+                    analysis[dense_key] = value.new(dense_pivot_count, *value.shape)
+                analysis[dense_key][i] = value
+
+        # Compute saddle values
+        for key, value in list(analysis.items()):
+            if len(value.shape) == 1 or value.shape[1] == 1:
+                analysis[key.replace("dense_", "saddle_")] = value.max()
+            else:
+                print(key)
+
+        return analysis
 
 
 def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):

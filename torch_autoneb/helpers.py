@@ -1,7 +1,27 @@
-from itertools import repeat
-from functools import reduce
 import operator
+from functools import reduce
+from itertools import repeat
+
 import collections
+
+try:
+    from tqdm import tqdm as pbar
+except ModuleNotFoundError:
+    class pbar:
+        def __init__(self, iterable=None, desc=None, total=None, *args, **kwargs):
+            self.iterable = iterable
+
+        def __iter__(self):
+            yield from self.iterable
+
+        def __enter__(self):
+            pass
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        def update(self, N=None):
+            pass
 
 
 def ntuple(x, n):

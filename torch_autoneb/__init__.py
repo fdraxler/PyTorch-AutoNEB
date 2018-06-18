@@ -4,29 +4,11 @@ import torch
 from networkx import MultiGraph, Graph
 from torch import optim
 
+from torch_autoneb.helpers import pbar
 from torch_autoneb.hyperparameters import NEBHyperparameters, OptimHyperparameters, AutoNEBHyperparameters, LandscapeExplorationHyperparameters
 from torch_autoneb.models import ModelWrapper
 from torch_autoneb.neb import NEB
 from torch_autoneb.suggest import suggest_pair
-
-try:
-    from tqdm import tqdm as pbar
-except ModuleNotFoundError:
-    class pbar:
-        def __init__(self, iterable=None, desc=None, total=None, *args, **kwargs):
-            self.iterable = iterable
-
-        def __iter__(self):
-            yield from self.iterable
-
-        def __enter__(self):
-            pass
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        def update(self, N=None):
-            pass
 
 __all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph"]
 

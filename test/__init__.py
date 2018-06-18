@@ -65,13 +65,15 @@ def _create_xor_model():
 
 
 class TestAlgorithms(TestCase):
+    def setUp(self):
+        self.model = _create_xor_model()
+
+        min_eval_config = EvalHyperparameters(128)
+        min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
+        self.minima = [find_minimum(self.model, min_optim_config) for _ in range(2)]
+
     def test_find_minimum(self):
-        model = _create_xor_model()
-
-        eval_config = EvalHyperparameters(128)
-        config = OptimHyperparameters(100, "Adam", {}, eval_config)
-
-        result = find_minimum(model, config)
+        result = self.minima[0]
 
         required_keys = [
             "coords",
@@ -84,11 +86,7 @@ class TestAlgorithms(TestCase):
             self.assertTrue(key in result, f"{key} not in result")
 
     def test_neb(self):
-        model = _create_xor_model()
-
-        min_eval_config = EvalHyperparameters(128)
-        min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
-        minima = [find_minimum(model, min_optim_config) for _ in range(2)]
+        minima = self.minima[:2]
 
         neb_eval_config = EvalHyperparameters(128)
         neb_optim_config = OptimHyperparameters(100, "Adam", {}, neb_eval_config)
@@ -97,24 +95,31 @@ class TestAlgorithms(TestCase):
         result = neb({
             "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
             "target_distances": torch.ones(1)
-        }, model, neb_config)
+        }, self.model, neb_config)
 
         required_keys = [
             "path_coords",
             "target_distances",
-            "sad_train_error",
-            "sad_train_loss",
-            "sad_test_error",
-            "sad_test_loss",
-            "sub_train_error",
-            "sub_train_loss",
-            "sub_test_error",
-            "sub_test_loss",
+            "saddle_train_error",
+            "saddle_train_loss",
+            "saddle_test_error",
+            "saddle_test_loss",
+            "dense_train_error",
+            "dense_train_loss",
+            "dense_test_error",
+            "dense_test_loss",
         ]
         for key in required_keys:
             self.assertTrue(key in result, f"{key} not in result")
+            if "saddle_" in key:
+                print(key, result[key].item())
+
+    def test_metrics(self):
+        # Test that all metrics are working as intended
+        pass
 
     def test_auto_neb(self):
+        # Test AutoNEB procedure
         pass
 
     def test_suggest_engines(self):
@@ -127,7 +132,6 @@ class TestAlgorithms(TestCase):
         def weight(id_pair):
             return sum(node ** 2 for node in id_pair)
 
-        engines = [mst_suggest]
         unfinished_edge = (1, 3)
 
         # Disconnect suggest
@@ -174,6 +178,16 @@ class TestAlgorithms(TestCase):
             graph.add_edge(*pair, key=1, weight=weight(pair))
             graph.add_edge(*pair, key=2, weight=weight(pair))
         self.assertEqual(len(correct_order), 0, "mst_suggest missing suggestions!")
+
+
+class TestCudaAlgorithms(TestAlgorithms):
+    def setUp(self):
+        self.model = _create_xor_model()
+        self.model.to("cuda")
+
+        min_eval_config = EvalHyperparameters(128)
+        min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
+        self.minima = [find_minimum(self.model, min_optim_config) for _ in range(2)]
 
 
 if __name__ == '__main__':
