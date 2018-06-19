@@ -29,7 +29,7 @@ def main():
     # === Ensure the specified number of minima ===
     for _ in _tqdm(range(len(graph.nodes), minima_count)):
         minimum_data = find_minimum(model, minimisation_hyperparameters)
-        graph.add_node(max(graph.nodes) + 1, **minimum_data)
+        graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **minimum_data)
 
     # === Connect minima ordered by suggestion algorithm ===
     auto_neb(model, auto_neb_hyperparameters, graph, suggest_engines)
