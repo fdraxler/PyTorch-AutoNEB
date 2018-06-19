@@ -6,7 +6,7 @@ from networkx import MultiGraph, Graph, minimum_spanning_tree
 from torch import optim
 
 from torch_autoneb.helpers import pbar
-from torch_autoneb.hyperparameters import NEBHyperparameters, OptimHyperparameters, AutoNEBHyperparameters, LandscapeExplorationHyperparameters
+from torch_autoneb.hyperparameters import NEBConfig, OptimConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.models import ModelWrapper
 from torch_autoneb.neb import NEB
 from torch_autoneb.suggest import suggest_pair
@@ -16,8 +16,12 @@ __all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pic
 logger = getLogger(__name__)
 
 
-def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
-    optimiser = getattr(optim, config.optim_name)(model.parameters(), **config.optim_args)  # type: optim.Optimizer
+def find_minimum(model: ModelWrapper, config: OptimConfig) -> dict:
+    optimiser = config.optim_type(model.parameters(), **config.optim_args)  # type: optim.Optimizer
+
+    # Wrap in scheduler
+    if config.scheduler_type is not None:
+        optimiser = config.scheduler_type(optimiser, **config.scheduler_args)
 
     # Initialise
     model.initialise_randomly()
@@ -39,16 +43,18 @@ def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     return result
 
 
-def neb(previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) -> dict:
-    # Initialise chain
-    previous_path_coords = previous_cycle_data["path_coords"]
-    previous_target_distances = previous_cycle_data["target_distances"]
-    start_path, target_distances = config.fill_method.fill(previous_path_coords, config.insert_count, previous_target_distances, previous_cycle_data)
+def neb(previous_cycle_data, model: ModelWrapper, config: NEBConfig) -> dict:
+    # Initialise chain by inserting pivots
+    start_path, target_distances = config.insert_method(previous_cycle_data, **config.insert_args)
 
     # Model and optimiser
     neb_model = NEB(model, start_path, target_distances)
     optim_config = config.optim_config
-    optimiser = getattr(optim, optim_config.optim_name)(neb_model.parameters(), **optim_config.optim_args)  # type: optim.Optimizer
+    optimiser = optim_config.optim_type(neb_model.parameters(), **optim_config.optim_args)  # type: optim.Optimizer
+
+    # Wrap in scheduler
+    if optim_config.scheduler_type is not None:
+        optimiser = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
 
     # Optimise
     for _ in pbar(range(optim_config.nsteps), "NEB"):
@@ -68,7 +74,7 @@ def neb(previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) ->
     return result
 
 
-def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHyperparameters):
+def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBConfig):
     # Continue existing cycles or start from scratch
     if m2 in graph[m1]:
         existing_edges = graph[m1][m2]
@@ -90,12 +96,12 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHype
         graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
 
 
-def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: LandscapeExplorationHyperparameters):
+def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: LandscapeExplorationConfig):
     try:
         with pbar(desc="Landscape Exploration") as bar:
             while True:
                 # Suggest new pair based on current graph
-                m1, m2 = suggest_pair(graph, config.value_key, config.weight_key, *config.suggest_engines)
+                m1, m2 = suggest_pair(graph, config.value_key, config.weight_key, *config.suggest_methods)
                 if m1 is None or m2 is None:
                     break
                 auto_neb(m1, m2, graph, model, config.auto_neb_config)

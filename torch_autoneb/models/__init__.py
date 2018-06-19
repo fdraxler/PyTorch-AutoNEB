@@ -8,7 +8,7 @@ from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
-from torch_autoneb.hyperparameters import EvalHyperparameters
+from torch_autoneb.hyperparameters import EvalConfig
 
 
 class ModelInterface:
@@ -186,7 +186,7 @@ class ModelWrapper(ModelInterface):
         if update_model:
             self._coords_to_model()
 
-    def adapt_to_config(self, config: EvalHyperparameters):
+    def adapt_to_config(self, config: EvalConfig):
         """
         Adapts the model to hyperparameters, if supported.
 
@@ -225,7 +225,7 @@ class DataModel(Module):
         self.dataset_loaders = {}
         self.dataset_iters = {}
 
-    def adapt_to_config(self, config: EvalHyperparameters):
+    def adapt_to_config(self, config: EvalConfig):
         self.batch_size = config.batch_size
 
     def forward(self, dataset="train", **kwargs):

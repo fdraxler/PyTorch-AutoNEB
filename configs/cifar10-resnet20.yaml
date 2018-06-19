@@ -1,0 +1,73 @@
+dataset: cifar10
+architecture: ResNet-20
+
+# Minimisation
+minima-count: 10
+minimum:
+  nsteps: 64000
+  algorithm:
+    name: SGD-Momentum
+    args:
+      lr: 0.1
+  scheduler:
+    name: MultiStepLR
+    args:
+      milestones:
+        - 32000
+        - 48000
+  eval:
+    batch-size: 128
+
+# Landscape exploration
+exploration:
+  value-key: train_loss
+  weight-key: saddle_train_loss
+  suggest:
+    - unfinished
+    - disconnected
+    - suggest
+  autoneb:
+    # The first cycle should contain all information, subsequent cycles only _differences_ from the previous
+    # 4 times 1000 steps with lr=0.1
+    - insert:
+        name: equal
+        args:
+          count: 3
+      subsample-pivot-count: 9
+      spring-constant: inf
+      optim:
+        nsteps: 1000
+        algorithm:
+          name: SGD-Momentum
+          args:
+            lr: 0.1
+        scheduler: null
+    - insert:
+        name: highest
+        args:
+          count: 2
+          key: dense_train_loss
+    - {} # same as previous
+    - {}
+    # 2 times 2000 steps with lr=0.1
+    - optim:
+        nsteps: 2000
+    - {}
+    # 4 times lr=0.01
+    - optim:
+        nsteps: 1000
+        algorithm:
+          args:
+            lr: 0.01
+    - {}
+    - {}
+    - {}
+    # 4 times lr=0.001
+    - optim:
+        algorithm:
+          args:
+            lr: 0.001
+    - {}
+    - {}
+    - {}
+

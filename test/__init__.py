@@ -8,10 +8,9 @@ from torch import FloatTensor, LongTensor, normal
 from torch.nn import NLLLoss
 from torch.utils.data import Dataset
 
-from torch_autoneb import OptimHyperparameters, find_minimum, neb, suggest_pair, auto_neb
-from torch_autoneb.fill.equal import FillEqual
-from torch_autoneb.fill.highest import FillHighest
-from torch_autoneb.hyperparameters import EvalHyperparameters, NEBHyperparameters, AutoNEBHyperparameters
+from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
+from torch_autoneb.fill import equal, highest
+from torch_autoneb.hyperparameters import EvalConfig, NEBConfig, AutoNEBConfig
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.suggest.disconnected import disconnected_suggest
@@ -74,8 +73,8 @@ class TestAlgorithms(TestCase):
         cls.model = _create_xor_model()
         cls.model.to(cls.device)
 
-        min_eval_config = EvalHyperparameters(128)
-        min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
+        min_eval_config = EvalConfig(128)
+        min_optim_config = OptimConfig(100, "Adam", {}, None, None, min_eval_config)
         cls.minima = [find_minimum(cls.model, min_optim_config) for _ in range(2)]
 
     def test_find_minimum(self):
@@ -94,9 +93,9 @@ class TestAlgorithms(TestCase):
     def test_neb(self):
         minima = self.minima[:2]
 
-        neb_eval_config = EvalHyperparameters(128)
-        neb_optim_config = OptimHyperparameters(100, "Adam", {}, neb_eval_config)
-        neb_config = NEBHyperparameters(float("inf"), FillEqual(), neb_optim_config, 3, 1)
+        neb_eval_config = EvalConfig(128)
+        neb_optim_config = OptimConfig(100, "Adam", {}, neb_eval_config)
+        neb_config = NEBConfig(float("inf"), equal, {"count": 3}, 1, neb_optim_config)
 
         result = neb({
             "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
@@ -132,16 +131,16 @@ class TestAlgorithms(TestCase):
 
         # Set up AutoNEB schedule
         spring_constant = float("inf")
-        eval_config = EvalHyperparameters(128)
-        optim_config_1 = OptimHyperparameters(100, "SGD", {"lr": 0.1}, eval_config)
-        optim_config_2 = OptimHyperparameters(100, "SGD", {"lr": 0.01}, eval_config)
+        eval_config = EvalConfig(128)
+        optim_config_1 = OptimConfig(100, "SGD", {"lr": 0.1}, None, None, eval_config)
+        optim_config_2 = OptimConfig(100, "SGD", {"lr": 0.01}, None, None, eval_config)
         neb_configs = [
-            NEBHyperparameters(spring_constant, FillEqual(), optim_config_1, 3, 9),
-            NEBHyperparameters(spring_constant, FillHighest(), optim_config_1, 2, 9),
-            NEBHyperparameters(spring_constant, FillHighest(), optim_config_2, 2, 9),
-            NEBHyperparameters(spring_constant, FillHighest(), optim_config_2, 2, 9),
+            NEBConfig(spring_constant, equal, {"count": 2}, 9, optim_config_1),
+            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_1),
+            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_2),
+            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_2),
         ]
-        auto_neb_config = AutoNEBHyperparameters(neb_configs)
+        auto_neb_config = AutoNEBConfig(neb_configs)
         self.assertEqual(auto_neb_config.cycle_count, len(neb_configs))
 
         # Run AutoNEB

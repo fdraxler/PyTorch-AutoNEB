@@ -5,4 +5,4 @@ setup(name='PyTorch-AutoNEB',
       description='PyTorch AutoNEB implementation to identify minimum energy paths, e.g. in neural network loss landscapes (https://arxiv.org/abs/1803.00885)',
       author='Felix Draxler',
       author_email='felix.draxler@iwr.uni-heidelberg.de',
-      packages=['torch_autoneb'], requires=['networkx', 'torch', 'torchvision'])
+      packages=['torch_autoneb'], requires=['networkx', 'torch'])
