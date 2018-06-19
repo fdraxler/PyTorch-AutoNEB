@@ -1,7 +1,8 @@
 import pickle
+from logging import getLogger
 
 import torch
-from networkx import MultiGraph, Graph
+from networkx import MultiGraph, Graph, minimum_spanning_tree
 from torch import optim
 
 from torch_autoneb.helpers import pbar
@@ -11,6 +12,8 @@ from torch_autoneb.neb import NEB
 from torch_autoneb.suggest import suggest_pair
 
 __all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph"]
+
+logger = getLogger(__name__)
 
 
 def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
@@ -30,7 +33,9 @@ def find_minimum(model: ModelWrapper, config: OptimHyperparameters) -> dict:
     }
 
     # Analyse
-    result.update(model.analyse())
+    analysis = model.analyse()
+    logger.debug(f"Found minimum: {analysis}.")
+    result.update(analysis)
     return result
 
 
@@ -56,14 +61,17 @@ def neb(previous_cycle_data, model: ModelWrapper, config: NEBHyperparameters) ->
     }
 
     # Analyse
-    result.update(neb_model.analyse())
+    analysis = neb_model.analyse(config.subsample_pivot_count)
+    saddle_analysis = {key: value for key, value in analysis.items() if "saddle_" in key}
+    logger.debug(f"Found saddle: {saddle_analysis}.")
+    result.update(analysis)
     return result
 
 
 def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHyperparameters):
     # Continue existing cycles or start from scratch
-    existing_edges = graph[m1][m2]
-    if len(existing_edges) > 0:
+    if m2 in graph[m1]:
+        existing_edges = graph[m1][m2]
         previous_cycle_idx = max(existing_edges[m1][m2])
         previous_cycle_data = existing_edges[m1][m2][previous_cycle_idx]
         start_cycle_idx = previous_cycle_idx + 1
@@ -76,21 +84,35 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBHype
     assert start_cycle_idx <= config.cycle_count
 
     # Run NEB and add to graph
-    for cycle_idx in pbar(range(start_cycle_idx, config.cycle_count + 1)):
-        cycle_config = config.hyperparameter_sets[start_cycle_idx - 1]
-        connection_data = neb(m1, m2, previous_cycle_data, model, cycle_config)
+    for cycle_idx in pbar(range(start_cycle_idx, config.cycle_count + 1), "AutoNEB"):
+        cycle_config = config.neb_configs[start_cycle_idx - 1]
+        connection_data = neb(previous_cycle_data, model, cycle_config)
         graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
 
 
 def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: LandscapeExplorationHyperparameters):
-    with pbar(desc="Landscape Exploration") as bar:
-        while True:
-            # Suggest new pair based on current graph
-            m1, m2 = suggest_pair(graph, config.value_key, config.weight_key, *config.suggest_engines)
-            if m1 is None or m2 is None:
-                break
-            auto_neb(m1, m2, graph, model, config.auto_neb_config)
-            bar.update()
+    try:
+        with pbar(desc="Landscape Exploration") as bar:
+            while True:
+                # Suggest new pair based on current graph
+                m1, m2 = suggest_pair(graph, config.value_key, config.weight_key, *config.suggest_engines)
+                if m1 is None or m2 is None:
+                    break
+                auto_neb(m1, m2, graph, model, config.auto_neb_config)
+                bar.update()
+
+                # Analyse new saddle
+                simple_graph = to_simple_graph(graph, config.weight_key)
+                best_saddle = simple_graph[m1][m2][config.weight_key]
+                in_mst_str = "included" if minimum_spanning_tree(simple_graph, config.weight_key) else "not included"
+                logger.info(f"Saddle loss between {m1} and {m2} is {best_saddle}, {in_mst_str} in MST.")
+    except KeyboardInterrupt:
+        raise
+    finally:
+        simple_graph = to_simple_graph(graph, config.weight_key)
+        mst_graph = minimum_spanning_tree(simple_graph, config.weight_key)
+        mean_saddle_loss = sum(simple_graph.get_edge_data(*edge)[config.weight_key] for edge in mst_graph.edges) / len(mst_graph.edges)
+        logger.info(f"Average loss in MST: {mean_saddle_loss}.")
 
 
 def to_simple_graph(graph: MultiGraph, weight_key: str) -> Graph:

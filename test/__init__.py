@@ -1,6 +1,6 @@
 import unittest
 from itertools import product, repeat
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 
 import torch
 from networkx import MultiGraph
@@ -8,9 +8,10 @@ from torch import FloatTensor, LongTensor, normal
 from torch.nn import NLLLoss
 from torch.utils.data import Dataset
 
-from torch_autoneb import OptimHyperparameters, find_minimum, neb, suggest_pair
+from torch_autoneb import OptimHyperparameters, find_minimum, neb, suggest_pair, auto_neb
 from torch_autoneb.fill.equal import FillEqual
-from torch_autoneb.hyperparameters import EvalHyperparameters, NEBHyperparameters
+from torch_autoneb.fill.highest import FillHighest
+from torch_autoneb.hyperparameters import EvalHyperparameters, NEBHyperparameters, AutoNEBHyperparameters
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.suggest.disconnected import disconnected_suggest
@@ -65,12 +66,17 @@ def _create_xor_model():
 
 
 class TestAlgorithms(TestCase):
-    def setUp(self):
-        self.model = _create_xor_model()
+    device = "cpu"
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestAlgorithms, cls).setUpClass()
+        cls.model = _create_xor_model()
+        cls.model.to(cls.device)
 
         min_eval_config = EvalHyperparameters(128)
         min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
-        self.minima = [find_minimum(self.model, min_optim_config) for _ in range(2)]
+        cls.minima = [find_minimum(cls.model, min_optim_config) for _ in range(2)]
 
     def test_find_minimum(self):
         result = self.minima[0]
@@ -90,7 +96,7 @@ class TestAlgorithms(TestCase):
 
         neb_eval_config = EvalHyperparameters(128)
         neb_optim_config = OptimHyperparameters(100, "Adam", {}, neb_eval_config)
-        neb_config = NEBHyperparameters(float("inf"), FillEqual(), neb_optim_config, 3)
+        neb_config = NEBHyperparameters(float("inf"), FillEqual(), neb_optim_config, 3, 1)
 
         result = neb({
             "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
@@ -120,9 +126,36 @@ class TestAlgorithms(TestCase):
 
     def test_auto_neb(self):
         # Test AutoNEB procedure
-        pass
+        graph = MultiGraph()
+        for idx, minimum in enumerate(self.minima):
+            graph.add_node(idx + 1, **minimum)
 
-    def test_suggest_engines(self):
+        # Set up AutoNEB schedule
+        spring_constant = float("inf")
+        eval_config = EvalHyperparameters(128)
+        optim_config_1 = OptimHyperparameters(100, "SGD", {"lr": 0.1}, eval_config)
+        optim_config_2 = OptimHyperparameters(100, "SGD", {"lr": 0.01}, eval_config)
+        neb_configs = [
+            NEBHyperparameters(spring_constant, FillEqual(), optim_config_1, 3, 9),
+            NEBHyperparameters(spring_constant, FillHighest(), optim_config_1, 2, 9),
+            NEBHyperparameters(spring_constant, FillHighest(), optim_config_2, 2, 9),
+            NEBHyperparameters(spring_constant, FillHighest(), optim_config_2, 2, 9),
+        ]
+        auto_neb_config = AutoNEBHyperparameters(neb_configs)
+        self.assertEqual(auto_neb_config.cycle_count, len(neb_configs))
+
+        # Run AutoNEB
+        auto_neb(1, 2, graph, self.model, auto_neb_config)
+        self.assertEqual(len(graph.edges), auto_neb_config.cycle_count)
+
+
+@skipUnless(torch.cuda.is_available(), "Cuda is not available")
+class TestCudaAlgorithms(TestAlgorithms):
+    device = "cuda"
+
+
+class TestSuggestEngines(TestCase):
+    def test_sequence(self):
         graph = MultiGraph()
         graph.add_node(1, value=1)  # Global minimum
         graph.add_node(2, value=2)
@@ -178,16 +211,6 @@ class TestAlgorithms(TestCase):
             graph.add_edge(*pair, key=1, weight=weight(pair))
             graph.add_edge(*pair, key=2, weight=weight(pair))
         self.assertEqual(len(correct_order), 0, "mst_suggest missing suggestions!")
-
-
-class TestCudaAlgorithms(TestAlgorithms):
-    def setUp(self):
-        self.model = _create_xor_model()
-        self.model.to("cuda")
-
-        min_eval_config = EvalHyperparameters(128)
-        min_optim_config = OptimHyperparameters(100, "Adam", {}, min_eval_config)
-        self.minima = [find_minimum(self.model, min_optim_config) for _ in range(2)]
 
 
 if __name__ == '__main__':

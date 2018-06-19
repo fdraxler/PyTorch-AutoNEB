@@ -109,7 +109,7 @@ class ModelWrapper(ModelInterface):
         final = 0
         for offset, data, size, is_buffer in self.iterate_params_buffers():
             # Copy coordinates
-            data[:] = 7  # self.coords[offset:offset + size].reshape(data.shape)
+            data[:] = self.coords[offset:offset + size].reshape(data.shape)
 
             # Size consistency check
             final = final + size
@@ -247,8 +247,11 @@ class DataModel(Module):
                 del self.dataset_iters[dataset]
 
         # Apply model on batch and use returned loss
+        return self.model(*self.batch_to_device(batch), **kwargs)
+
+    def batch_to_device(self, batch):
         device = list(self.model.parameters())[0].device
-        return self.model(*[item.to(device) for item in batch], **kwargs)
+        return [item.to(device) for item in batch]
 
     def analyse(self):
         # Go through all data points and accumulate stats
@@ -256,6 +259,7 @@ class DataModel(Module):
         for ds_name, dataset in self.datasets.items():
             ds_length = len(dataset)
             for batch in DataLoader(dataset, self.batch_size):
+                batch = self.batch_to_device(batch)
                 result = self.model.analyse(*batch)
                 for key, value in result.items():
                     ds_key = f"{ds_name}_{key}"

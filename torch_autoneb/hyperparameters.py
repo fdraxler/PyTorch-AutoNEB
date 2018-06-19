@@ -15,17 +15,18 @@ class OptimHyperparameters:
 
 
 class NEBHyperparameters:
-    def __init__(self, spring_constant: float, fill_method: Fill, optim_config: OptimHyperparameters, insert_count: int):
+    def __init__(self, spring_constant: float, fill_method: Fill, optim_config: OptimHyperparameters, insert_count: int, subsample_pivot_count: int):
         self.insert_count = insert_count
         self.fill_method = fill_method
         self.spring_constant = spring_constant
         self.optim_config = optim_config
+        self.subsample_pivot_count = subsample_pivot_count
 
 
 class AutoNEBHyperparameters:
-    def __init__(self, cycle_count: int):
-        self.cycle_count = cycle_count
-        self.hyperparameter_sets = [OptimHyperparameters() for _ in range(cycle_count)]
+    def __init__(self, neb_configs: list):
+        self.cycle_count = len(neb_configs)
+        self.neb_configs = neb_configs
 
 
 class LandscapeExplorationHyperparameters:
