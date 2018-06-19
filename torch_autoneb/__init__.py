@@ -91,7 +91,7 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBConf
 
     # Run NEB and add to graph
     for cycle_idx in pbar(range(start_cycle_idx, config.cycle_count + 1), "AutoNEB"):
-        cycle_config = config.neb_configs[start_cycle_idx - 1]
+        cycle_config = config.neb_configs[cycle_idx - 1]
         connection_data = neb(previous_cycle_data, model, cycle_config)
         graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
 

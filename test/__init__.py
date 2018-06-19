@@ -6,6 +6,7 @@ import torch
 from networkx import MultiGraph
 from torch import FloatTensor, LongTensor, normal
 from torch.nn import NLLLoss
+from torch.optim import Adam, SGD
 from torch.utils.data import Dataset
 
 from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
@@ -74,7 +75,7 @@ class TestAlgorithms(TestCase):
         cls.model.to(cls.device)
 
         min_eval_config = EvalConfig(128)
-        min_optim_config = OptimConfig(100, "Adam", {}, None, None, min_eval_config)
+        min_optim_config = OptimConfig(100, Adam, {}, None, None, min_eval_config)
         cls.minima = [find_minimum(cls.model, min_optim_config) for _ in range(2)]
 
     def test_find_minimum(self):
@@ -94,7 +95,7 @@ class TestAlgorithms(TestCase):
         minima = self.minima[:2]
 
         neb_eval_config = EvalConfig(128)
-        neb_optim_config = OptimConfig(100, "Adam", {}, neb_eval_config)
+        neb_optim_config = OptimConfig(100, Adam, {}, None, None, neb_eval_config)
         neb_config = NEBConfig(float("inf"), equal, {"count": 3}, 1, neb_optim_config)
 
         result = neb({
@@ -119,10 +120,6 @@ class TestAlgorithms(TestCase):
             if "saddle_" in key:
                 print(key, result[key].item())
 
-    def test_metrics(self):
-        # Test that all metrics are working as intended
-        pass
-
     def test_auto_neb(self):
         # Test AutoNEB procedure
         graph = MultiGraph()
@@ -132,13 +129,13 @@ class TestAlgorithms(TestCase):
         # Set up AutoNEB schedule
         spring_constant = float("inf")
         eval_config = EvalConfig(128)
-        optim_config_1 = OptimConfig(100, "SGD", {"lr": 0.1}, None, None, eval_config)
-        optim_config_2 = OptimConfig(100, "SGD", {"lr": 0.01}, None, None, eval_config)
+        optim_config_1 = OptimConfig(100, SGD, {"lr": 0.1}, None, None, eval_config)
+        optim_config_2 = OptimConfig(100, SGD, {"lr": 0.01}, None, None, eval_config)
         neb_configs = [
-            NEBConfig(spring_constant, equal, {"count": 2}, 9, optim_config_1),
-            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_1),
-            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_2),
-            NEBConfig(spring_constant, highest, {"count": 3}, 9, optim_config_2),
+            NEBConfig(spring_constant, equal, {"count": 2}, 1, optim_config_1),
+            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_1),
+            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_2),
+            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_2),
         ]
         auto_neb_config = AutoNEBConfig(neb_configs)
         self.assertEqual(auto_neb_config.cycle_count, len(neb_configs))
@@ -171,7 +168,7 @@ class TestSuggestEngines(TestCase):
             (1, 2), (1, 3), (1, 4),
         ]
         while True:
-            pair = suggest_pair(graph, "value", "weight", disconnected_suggest)
+            pair = suggest_pair(graph, "value", "weight", [disconnected_suggest])
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "disconnected_suggest gives more pairs than necessary")
@@ -188,7 +185,7 @@ class TestSuggestEngines(TestCase):
         ]
         unfinished_suggest = create_unfinished_suggest(2)
         while True:
-            pair = suggest_pair(graph, "value", "weight", unfinished_suggest)
+            pair = suggest_pair(graph, "value", "weight", [unfinished_suggest])
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "unfinished_suggest gives more pairs than necessary")
@@ -202,7 +199,7 @@ class TestSuggestEngines(TestCase):
             (2, 3),  # Replace (1, 3)
         ]
         while True:
-            pair = suggest_pair(graph, "value", "weight", mst_suggest)
+            pair = suggest_pair(graph, "value", "weight", [mst_suggest])
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "mst_suggest gives more pairs than necessary")

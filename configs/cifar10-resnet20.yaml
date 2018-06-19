@@ -38,9 +38,10 @@ exploration:
       optim:
         nsteps: 1000
         algorithm:
-          name: SGD-Momentum
+          name: SGD
           args:
             lr: 0.1
+            momentum: 0.9
         scheduler: null
     - insert:
         name: highest
