@@ -5,7 +5,7 @@ from shutil import copyfile
 
 from networkx import MultiGraph
 from os.path import isdir, isfile, join
-from yaml import load
+from yaml import safe_load
 
 from torch_autoneb import load_pickle_graph, find_minimum, _tqdm, landscape_exploration
 from torch_autoneb.models import ModelWrapper
@@ -15,7 +15,7 @@ logger = getLogger(__name__)
 
 def read_config_file(config_file: str):
     with open(config_file, "r") as file:
-        config = load(file)
+        config = safe_load(file)
         model = ModelWrapper(None)
 
     return model, minima_count, min_config, lex_config
@@ -64,9 +64,9 @@ def setup_project(config_file, project_directory):
     else:
         # Make sure that the config file has not been modified
         with open(project_config_path, "r") as file:
-            project_config = load(file)
+            project_config = safe_load(file)
         with open(config_file, "r") as file:
-            original_config = load(file)
+            original_config = safe_load(file)
         if project_config != original_config:
             raise ValueError(f"Config file 'config.yaml' in project directory is structurally different from original config '{config_file}'")
     return graph_path, project_config_path

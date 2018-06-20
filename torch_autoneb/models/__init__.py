@@ -240,7 +240,7 @@ class DataModel(Module):
             if dataset not in self.dataset_iters:
                 if dataset not in self.dataset_loaders:
                     # todo multi-threaded batch loading
-                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, True)
+                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, shuffle=True, drop_last=True)
                 loader = self.dataset_loaders[dataset]
                 self.dataset_iters[dataset] = iter(loader)
             iterator = self.dataset_iters[dataset]
@@ -268,7 +268,7 @@ class DataModel(Module):
                 result = self.model.analyse(*batch)
                 for key, value in result.items():
                     ds_key = f"{ds_name}_{key}"
-                    if key not in analysis:
+                    if ds_key not in analysis:
                         analysis[ds_key] = 0
                     analysis[ds_key] += value * batch[0].shape[0] / ds_length
         return analysis
@@ -294,7 +294,9 @@ class CompareModel(Module):
         hard_pred = soft_pred.data.sort(1, True)[1]
 
         hard_pred_correct = hard_pred[:].eq(target.data.view(-1, 1)).cumsum(1)
+        error = 1 - hard_pred_correct[:, 0].float().mean().item()
+        loss = self.loss(soft_pred, target).item()
         return {
-            CompareModel.ERROR: 1 - hard_pred_correct[:, 0].float().mean().item(),
-            CompareModel.LOSS: self.loss(soft_pred, target).item(),
+            CompareModel.ERROR: error,
+            CompareModel.LOSS: loss,
         }

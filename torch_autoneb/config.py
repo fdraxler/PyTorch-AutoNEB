@@ -5,14 +5,15 @@ import torch_autoneb
 
 
 def _with_new_keys(config_dict: dict) -> dict:
-    return {key.replace("_", "-"): value for key, value in config_dict}
+    return {key.replace("_", "-"): value for key, value in config_dict.items()}
 
 
 def _replace_instanciation(config, package):
     if isinstance(config, dict):
         # Name + args
-        assert len(set(config).difference({"name", "args"})) == 0, f"Found more keys for {key} than 'name' and 'args'."
-        return getattr(package, config["name"]), config["args"] if "args" in config else {}
+        name = config["name"]
+        del config["name"]
+        return getattr(package, name), config
     else:
         # Just the name
         return getattr(package, config), {}
@@ -38,8 +39,8 @@ class EvalConfig:
 class OptimConfig:
     def __init__(self, nsteps: int, optim_type, optim_args: dict, scheduler_type, scheduler_args: dict, eval_config: EvalConfig):
         self.nsteps = nsteps
-        self.optim_args = optim_args
         self.optim_type = optim_type
+        self.optim_args = optim_args
         self.scheduler_type = scheduler_type
         self.scheduler_args = scheduler_args
         self.eval_config = eval_config
@@ -47,19 +48,20 @@ class OptimConfig:
     @staticmethod
     def from_dict(config_dict: dict):
         config_dict = _with_new_keys(config_dict)
-        config_dict = _replace_instanciation(config_dict, "algorithm", optim)
-        config_dict = _replace_instanciation(config_dict, "scheduler", lr_scheduler)
+        config_dict["optim_type"], config_dict["optim_args"] = _replace_instanciation(config_dict, "algorithm", optim)
+        config_dict["scheduler_type"], config_dict["scheduler_args"] = _replace_instanciation(config_dict, "scheduler", lr_scheduler)
         config_dict["eval_config"] = EvalConfig.from_dict(config_dict["eval_config"])
         return OptimConfig(**config_dict)
 
 
 class NEBConfig:
-    def __init__(self, spring_constant: float, insert_method: callable, insert_args: dict, subsample_pivot_count: int, optim_config: OptimConfig):
+    def __init__(self, spring_constant: float, weight_decay: float, insert_method: callable, insert_args: dict, subsample_pivot_count: int, optim_config: OptimConfig):
+        self.spring_constant = spring_constant
+        self.weight_decay = weight_decay
         self.insert_args = insert_args
         self.insert_method = insert_method
-        self.spring_constant = spring_constant
-        self.optim_config = optim_config
         self.subsample_pivot_count = subsample_pivot_count
+        self.optim_config = optim_config
 
     @staticmethod
     def from_dict(config_dict: dict):
@@ -95,5 +97,5 @@ class LandscapeExplorationConfig:
     def from_dict(config_dict: dict):
         config_dict = _with_new_keys(config_dict)
         config_dict["suggest_methods"], config_dict["suggest_args"] = zip(*[_replace_instanciation(engine, torch_autoneb.suggest) for engine in config_dict["suggest"]])
-        config_dict["auto_neb_config"] = AutoNEBConfig.from_list(config_dict["auto_neb_config"])
+        config_dict["auto_neb_config"] = AutoNEBConfig.from_list(config_dict["autoneb"])
         return LandscapeExplorationConfig(**config_dict)

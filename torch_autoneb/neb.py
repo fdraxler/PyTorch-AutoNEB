@@ -10,12 +10,19 @@ from torch_autoneb.models import ModelWrapper, ModelInterface
 
 class NEB(ModelInterface):
     def __init__(self, model: ModelWrapper, path_coords: Tensor, target_distances: Tensor = None):
+        """
+        Creates a NEB instance that is prepared for evaluating the band.
+
+        For computing gradients, adapt_to_config has to be called with valid values.
+        """
         self.model = model
         self.path_coords = path_coords.clone()
         self.path_coords.requires_grad_()
         self.path_coords.grad = path_coords.clone().zero_()
         self.target_distances = target_distances
-        self.spring_constant = 0
+        # This will raise an exception if gradients are computed
+        self.spring_constant = -1
+        self.weight_decay = -1
 
     def get_device(self):
         return self.path_coords.device
@@ -40,6 +47,7 @@ class NEB(ModelInterface):
         """
         self.model.adapt_to_config(config.optim_config.eval_config)
         self.spring_constant = config.spring_constant
+        self.weight_decay = config.weight_decay
 
     def apply(self, gradient=False, **kwargs):
         npivots = self.path_coords.shape[0]
@@ -48,7 +56,7 @@ class NEB(ModelInterface):
         # Redistribute if spring_constant == inf
         assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
         if gradient and self.spring_constant == float("inf"):
-            self.path_coords[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances)
+            self.path_coords.data[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances).data
 
         # Compute losses (and gradients)
         for i in range(npivots):
@@ -56,8 +64,12 @@ class NEB(ModelInterface):
             losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):
                 # If the coordinates were modified, move them back to the cache
-                self.path_coords[i] = self.model.get_coords(update_cache=True)
+                self.path_coords[i] = self.model.get_coords(update_cache=True).detach()
                 self.path_coords.grad[i] = self.model.get_grad(update_cache=False)
+
+                assert self.weight_decay >= 0
+                if self.weight_decay > 0:
+                    self.path_coords.grad[i] += self.weight_decay * self.path_coords[i].detach()
             else:
                 # Make sure no gradient is there
                 self.path_coords.grad[i].zero_()
@@ -76,6 +88,7 @@ class NEB(ModelInterface):
                 # Project gradients perpendicular to tangent
                 self.path_coords.grad[i] -= self.path_coords.grad[i].dot(tangent) * tangent
 
+                assert self.spring_constant > 0
                 if self.spring_constant < float("inf"):
                     # Spring force parallel to tangent
                     self.path_coords.grad[i] += (d_prev - td_prev) - (d_next - td_next) * self.spring_constant * tangent
@@ -236,6 +249,7 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
             pos_prev = pos_next
             pos_next += current_distances[last_idx]
 
+        # todo: bug pos_prev = pos_next sometimes
         t = (position - pos_prev) / (pos_next - pos_prev)
         path_target[i] = (t * path_source[last_idx + 1] + (1 - t) * path_source[last_idx])
     path_target[nimages - 1] = path_source[-1]

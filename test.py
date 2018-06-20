@@ -1,5 +1,6 @@
 import unittest
 from itertools import product, repeat
+from os import listdir
 from unittest import TestCase, skipUnless
 
 import torch
@@ -11,6 +12,7 @@ from torch.optim import Adam, SGD
 from torch.utils.data import Dataset
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor, Pad, Compose
+from yaml import safe_load
 
 from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
 from torch_autoneb.config import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
@@ -97,7 +99,7 @@ class TestAlgorithms(TestCase):
 
         neb_eval_config = EvalConfig(128)
         neb_optim_config = OptimConfig(10, Adam, {}, None, None, neb_eval_config)
-        neb_config = NEBConfig(float("inf"), equal, {"count": 3}, 1, neb_optim_config)
+        neb_config = NEBConfig(float("inf"), 1e-5, equal, {"count": 3}, 1, neb_optim_config)
 
         result = neb({
             "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
@@ -134,11 +136,13 @@ class TestAlgorithms(TestCase):
         eval_config = EvalConfig(128)
         optim_config_1 = OptimConfig(10, SGD, {"lr": 0.1}, None, None, eval_config)
         optim_config_2 = OptimConfig(10, SGD, {"lr": 0.01}, None, None, eval_config)
+        weight_decay = 0
+        subsample_pivot_count = 1
         neb_configs = [
-            NEBConfig(spring_constant, equal, {"count": 2}, 1, optim_config_1),
-            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_1),
-            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_2),
-            NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_2),
+            NEBConfig(spring_constant, weight_decay, equal, {"count": 2}, subsample_pivot_count, optim_config_1),
+            NEBConfig(spring_constant, weight_decay, highest, {"count": 3, "key": "dense_train_loss"}, subsample_pivot_count, optim_config_1),
+            NEBConfig(spring_constant, weight_decay, highest, {"count": 3, "key": "dense_train_loss"}, subsample_pivot_count, optim_config_2),
+            NEBConfig(spring_constant, weight_decay, highest, {"count": 3, "key": "dense_train_loss"}, subsample_pivot_count, optim_config_2),
         ]
         auto_neb_config = AutoNEBConfig(neb_configs)
         self.assertEqual(auto_neb_config.cycle_count, len(neb_configs))
@@ -223,6 +227,7 @@ class TestModels(TestCase):
         cls.test_mnist = MNIST(join(dirname(__file__), "tmp/mnist"), False, transform, download=True)
         cls.input_size = cls.train_mnist[0][0].shape
         cls.output_size = 10
+        cls.random_error = 1 - (1 / cls.output_size)
 
     def _test_model(self, nn_model):
         loss_model = CompareModel(nn_model, NLLLoss())
@@ -235,7 +240,12 @@ class TestModels(TestCase):
 
         if cuda.is_available():
             model.to("cuda")
-        print(nn_model.__class__.__name__, model.analyse())
+        analysis = model.analyse()
+        for key, value in analysis.items():
+            if "error" in key:
+                self.assertLess(self.random_error * 0.9, value, f"Random {key} too low")
+                self.assertGreater(self.random_error * 1.1, value, f"Random {key} too high")
+        print(nn_model.__class__.__name__, analysis)
 
     def test_mlp(self):
         mlp = MLP(2, 10, self.input_size, self.output_size)
@@ -252,6 +262,17 @@ class TestModels(TestCase):
     def test_resnet(self):
         resnet = ResNet(20, self.input_size, self.output_size)
         self._test_model(resnet)
+
+
+class TestArguments(TestCase):
+    def test_parse_configs(self):
+        base_dir = join(dirname(__file__), "configs")
+        for config_file in listdir(base_dir):
+            if config_file.endswith(".yaml"):
+                with open(join(base_dir, config_file), "r") as file:
+                    config_dict = safe_load(file)
+                    config = LandscapeExplorationConfig.from_dict(config_dict["exploration"])
+                    self.assertIsInstance(config, LandscapeExplorationConfig)
 
 
 if __name__ == '__main__':

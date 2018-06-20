@@ -42,14 +42,19 @@ def find_minimum(model: ModelWrapper, config: OptimConfig) -> dict:
     return result
 
 
-def neb(previous_cycle_data, model: ModelWrapper, config: NEBConfig) -> dict:
+def neb(previous_cycle_data, model: ModelWrapper, neb_config: NEBConfig) -> dict:
     # Initialise chain by inserting pivots
-    start_path, target_distances = config.insert_method(previous_cycle_data, **config.insert_args)
+    start_path, target_distances = neb_config.insert_method(previous_cycle_data, **neb_config.insert_args)
 
-    # Model and optimiser
+    # Model
     neb_model = NEB(model, start_path, target_distances)
-    optim_config = config.optim_config
+    neb_model.adapt_to_config(neb_config)
+
+    # Load optimiser
+    optim_config = neb_config.optim_config
     optimiser = optim_config.optim_type(neb_model.parameters(), **optim_config.optim_args)  # type: optim.Optimizer
+    if "weight_decay" in optimiser.defaults:
+        assert optimiser.defaults["weight_decay"] == 0, "NEB is not compatible with weight decay on the optimiser. Set weight decay on NEB instead."
 
     # Wrap in scheduler
     if optim_config.scheduler_type is not None:
@@ -66,7 +71,7 @@ def neb(previous_cycle_data, model: ModelWrapper, config: NEBConfig) -> dict:
     }
 
     # Analyse
-    analysis = neb_model.analyse(config.subsample_pivot_count)
+    analysis = neb_model.analyse(neb_config.subsample_pivot_count)
     saddle_analysis = {key: value for key, value in analysis.items() if "saddle_" in key}
     logger.debug(f"Found saddle: {saddle_analysis}.")
     result.update(analysis)
