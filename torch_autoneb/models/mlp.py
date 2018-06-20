@@ -30,6 +30,8 @@ class MLP(Module):
         self.softmax = LogSoftmax(dim=1)
 
     def forward(self, data):
+        if len(data.shape) > 2:
+            data = data.reshape(data.shape[0], -1)
         data = self.body(data)
         data = self.final(data)
         data = self.softmax(data)

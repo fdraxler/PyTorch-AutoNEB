@@ -212,5 +212,10 @@ class TestSuggestEngines(TestCase):
         self.assertEqual(len(correct_order), 0, "mst_suggest missing suggestions!")
 
 
+class TestModels(TestCase):
+    def test_mlp(self):
+        mlp = MLP(2, 10)
+
+
 if __name__ == '__main__':
     unittest.main()

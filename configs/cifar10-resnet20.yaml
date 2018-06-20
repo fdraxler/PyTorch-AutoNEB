@@ -1,5 +1,8 @@
 dataset: cifar10
-architecture: ResNet-20
+architecture:
+  name: ResNet
+  args:
+    depth: 20
 
 # Minimisation
 minima-count: 10
