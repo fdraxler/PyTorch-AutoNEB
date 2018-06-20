@@ -4,15 +4,18 @@ from unittest import TestCase, skipUnless
 
 import torch
 from networkx import MultiGraph
-from torch import FloatTensor, LongTensor, normal
+from os.path import join, dirname
+from torch import FloatTensor, LongTensor, normal, cuda
 from torch.nn import NLLLoss
 from torch.optim import Adam, SGD
 from torch.utils.data import Dataset
+from torchvision.datasets import MNIST
+from torchvision.transforms import ToTensor, Pad, Compose
 
 from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
+from torch_autoneb.config import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.fill import equal, highest
-from torch_autoneb.hyperparameters import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
-from torch_autoneb.models import CompareModel, DataModel, ModelWrapper
+from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.suggest import disconnected, unfinished, mst
 
@@ -213,8 +216,42 @@ class TestSuggestEngines(TestCase):
 
 
 class TestModels(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        transform = Compose([Pad(2), ToTensor()])
+        cls.train_mnist = MNIST(join(dirname(__file__), "tmp/mnist"), True, transform, download=True)
+        cls.test_mnist = MNIST(join(dirname(__file__), "tmp/mnist"), False, transform, download=True)
+        cls.input_size = cls.train_mnist[0][0].shape
+        cls.output_size = 10
+
+    def _test_model(self, nn_model):
+        loss_model = CompareModel(nn_model, NLLLoss())
+        data_model = DataModel(loss_model, {
+            "train": self.train_mnist,
+            "test": self.test_mnist
+        })
+        model = ModelWrapper(data_model)
+        model.adapt_to_config(EvalConfig(1024))
+
+        if cuda.is_available():
+            model.to("cuda")
+        print(nn_model.__class__.__name__, model.analyse())
+
     def test_mlp(self):
-        mlp = MLP(2, 10)
+        mlp = MLP(2, 10, self.input_size, self.output_size)
+        self._test_model(mlp)
+
+    def test_cnn(self):
+        cnn = CNN(2, 12, 3, 1, 2, 1, 1, 16, self.input_size, self.output_size)
+        self._test_model(cnn)
+
+    def test_densenet(self):
+        densenet = DenseNet(12, 100, 1 / 2, True, self.input_size, self.output_size)
+        self._test_model(densenet)
+
+    def test_resnet(self):
+        resnet = ResNet(20, self.input_size, self.output_size)
+        self._test_model(resnet)
 
 
 if __name__ == '__main__':

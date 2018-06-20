@@ -3,8 +3,8 @@ from itertools import chain
 from torch import Tensor, linspace
 
 from torch_autoneb import pbar
+from torch_autoneb.config import NEBConfig
 from torch_autoneb.helpers import fast_inter_distance
-from torch_autoneb.hyperparameters import NEBConfig
 from torch_autoneb.models import ModelWrapper, ModelInterface
 
 

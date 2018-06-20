@@ -3,6 +3,10 @@ from functools import reduce
 
 from torch.nn import Module, BatchNorm2d, ReLU, AvgPool2d, Conv2d, Linear, Sequential
 
+"""
+Adapted from https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py for the CIFAR10/CIFAR100 setting described in https://arxiv.org/abs/1512.03385.
+"""
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -43,7 +47,7 @@ class BasicBlock(Module):
 
 
 class ResNet(Module):
-    def __init__(self, depth, dropout=0.0, batch_norm=True):
+    def __init__(self, depth, input_size, output_size, dropout=0.0, batch_norm=True):
         super().__init__()
 
         non_lin = ReLU()
@@ -63,7 +67,7 @@ class ResNet(Module):
         strides = [1, 2, 2]
 
         # Build ResNet
-        self.conv1 = conv3x3(int(self.input_size[0]), filters[0])
+        self.conv1 = conv3x3(int(input_size[0]), filters[0])
         self.inplanes = filters[0]
         self.bn1 = BatchNorm2d(filters[0])
         self.non_lin1 = non_lin
@@ -74,8 +78,8 @@ class ResNet(Module):
         self.layer3 = self._make_layer(filters[2], layers, strides[2], non_lin)
 
         # Average each filter
-        self.avgpool = AvgPool2d(int(self.input_size[1]) // reduce(operator.mul, strides, 1))
-        self.linear_out = Linear(filters[-1], self.out_features)
+        self.avgpool = AvgPool2d(int(input_size[1]) // reduce(operator.mul, strides, 1))
+        self.linear_out = Linear(filters[-1], output_size)
 
         self.kind = depth
         self.non_linearity = non_lin.__class__

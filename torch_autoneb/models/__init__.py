@@ -8,7 +8,7 @@ from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
 
-from torch_autoneb.hyperparameters import EvalConfig
+from torch_autoneb.config import EvalConfig
 from torch_autoneb.models.cnn import CNN
 from torch_autoneb.models.densenet import DenseNet
 from torch_autoneb.models.mlp import MLP

@@ -3,6 +3,10 @@ import math
 import torch
 from torch.nn import functional as F, BatchNorm2d, Conv2d, Module, Linear, Sequential
 
+"""
+Based on https://github.com/bamos/densenet.pytorch/blob/master/densenet.py
+"""
+
 
 class Bottleneck(Module):
     def __init__(self, n_channels, growth_rate):
@@ -45,7 +49,7 @@ class Transition(Module):
 
 
 class DenseNet(Module):
-    def __init__(self, growth_rate, depth, reduction, bottleneck):
+    def __init__(self, growth_rate, depth, reduction, bottleneck, input_size, output_size):
         super(DenseNet, self).__init__()
 
         if bottleneck:
@@ -53,8 +57,10 @@ class DenseNet(Module):
         else:
             n_dense_blocks = int((depth - 4) / 3)
 
+        # Assumes an images size of 32x32
+
         n_channels = 2 * growth_rate
-        self.conv1 = Conv2d(3, n_channels, kernel_size=3, padding=1, bias=False)
+        self.conv1 = Conv2d(input_size[0], n_channels, kernel_size=3, padding=1, bias=False)
 
         self.dense1 = self._make_dense(n_channels, growth_rate, n_dense_blocks, bottleneck)
         n_channels += n_dense_blocks * growth_rate
@@ -72,7 +78,7 @@ class DenseNet(Module):
         n_channels += n_dense_blocks * growth_rate
 
         self.bn1 = BatchNorm2d(n_channels)
-        self.linear_out = Linear(n_channels, out_features)
+        self.linear_out = Linear(n_channels, output_size)
 
     def _make_dense(self, n_channels, growth_rate, n_dense_blocks, bottleneck):
         layers = []

@@ -5,8 +5,8 @@ import torch
 from networkx import MultiGraph, Graph, minimum_spanning_tree
 from torch import optim
 
+from torch_autoneb.config import NEBConfig, OptimConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.helpers import pbar
-from torch_autoneb.hyperparameters import NEBConfig, OptimConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.models import ModelWrapper
 from torch_autoneb.neb import NEB
 
