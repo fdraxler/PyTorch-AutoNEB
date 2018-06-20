@@ -32,9 +32,10 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
     weights = previous_cycle_data["target_distances"]
     dense_data = previous_cycle_data[key]
 
-    assert (dense_data.shape[0] - 1) % (path_coords.shape[0] - 1) - 1 == 0, f"Bad shape of dense data {dense_data.shape}."
+    assert (dense_data.shape[0] - 1) % (path_coords.shape[0] - 1) == 0, f"Bad shape of dense data {dense_data.shape}."
+    assert float("nan") not in dense_data
 
-    interpolate_count = (dense_data.shape[0] - 1) / (path_coords.shape[0] - 1) - 1
+    interpolate_count = int((dense_data.shape[0] - 1) / (path_coords.shape[0] - 1) - 1)
     scores = path_coords.new(path_coords.shape[0] - 1, interpolate_count).zero_()
 
     alphas = torch.linspace(0, 1, interpolate_count + 2)[1:-1]

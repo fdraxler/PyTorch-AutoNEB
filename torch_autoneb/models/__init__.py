@@ -211,7 +211,8 @@ class ModelWrapper(ModelInterface):
 
     def analyse(self):
         self.model.eval()
-        return self.model.analyse()
+        with torch.set_grad_enabled(False):
+            return self.model.analyse()
 
 
 class DataModel(Module):
@@ -290,6 +291,6 @@ class CompareModel(Module):
 
         hard_pred_correct = hard_pred[:].eq(target.data.view(-1, 1)).cumsum(1)
         return {
-            CompareModel.ERROR: 1 - hard_pred_correct[:, 0].float().mean(),
-            CompareModel.LOSS: self.loss(soft_pred, target),
+            CompareModel.ERROR: 1 - hard_pred_correct[:, 0].float().mean().item(),
+            CompareModel.LOSS: self.loss(soft_pred, target).item(),
         }

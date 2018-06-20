@@ -125,6 +125,8 @@ class NEB(ModelInterface):
             point_analysis = self.model.analyse()
             for key, value in point_analysis.items():
                 dense_key = "dense_" + key
+                if not isinstance(value, Tensor):
+                    value = Tensor([value]).squeeze()
                 if dense_key not in analysis:
                     analysis[dense_key] = value.new(dense_pivot_count, *value.shape)
                 analysis[dense_key][i] = value
@@ -221,6 +223,7 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
     # The current distances between elements on chain
     current_distances = fast_inter_distance(path)
     target_positions = (weights / weights.sum()).cumsum(0) * current_distances.sum()  # Target positions of elements (spaced by weights)
+
     # Put each new item spaced by weights (measured along line) on the line
     last_idx = 0  # Index of previous pivot
     pos_prev = 0.  # Position of previous pivot on chain

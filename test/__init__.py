@@ -11,12 +11,10 @@ from torch.utils.data import Dataset
 
 from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
 from torch_autoneb.fill import equal, highest
-from torch_autoneb.hyperparameters import EvalConfig, NEBConfig, AutoNEBConfig
+from torch_autoneb.hyperparameters import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper
 from torch_autoneb.models.mlp import MLP
-from torch_autoneb.suggest.disconnected import disconnected_suggest
-from torch_autoneb.suggest.mst import mst_suggest
-from torch_autoneb.suggest.unfinished import create_unfinished_suggest
+from torch_autoneb.suggest import disconnected, unfinished, mst
 
 
 class XORDataset(Dataset):
@@ -24,9 +22,9 @@ class XORDataset(Dataset):
         self.train = train
 
         if train:
-            size = 50000
+            size = 500
         else:
-            size = 10000
+            size = 100
         each_size = size // 4
         assert each_size * 4 == size
 
@@ -95,7 +93,7 @@ class TestAlgorithms(TestCase):
         minima = self.minima[:2]
 
         neb_eval_config = EvalConfig(128)
-        neb_optim_config = OptimConfig(100, Adam, {}, None, None, neb_eval_config)
+        neb_optim_config = OptimConfig(10, Adam, {}, None, None, neb_eval_config)
         neb_config = NEBConfig(float("inf"), equal, {"count": 3}, 1, neb_optim_config)
 
         result = neb({
@@ -117,8 +115,10 @@ class TestAlgorithms(TestCase):
         ]
         for key in required_keys:
             self.assertTrue(key in result, f"{key} not in result")
+            value = result[key]
+            self.assertFalse(torch.isnan(value).any().item(), f"{key} contains a NaN value")
             if "saddle_" in key:
-                print(key, result[key].item())
+                print(key, value.item())
 
     def test_auto_neb(self):
         # Test AutoNEB procedure
@@ -129,8 +129,8 @@ class TestAlgorithms(TestCase):
         # Set up AutoNEB schedule
         spring_constant = float("inf")
         eval_config = EvalConfig(128)
-        optim_config_1 = OptimConfig(100, SGD, {"lr": 0.1}, None, None, eval_config)
-        optim_config_2 = OptimConfig(100, SGD, {"lr": 0.01}, None, None, eval_config)
+        optim_config_1 = OptimConfig(10, SGD, {"lr": 0.1}, None, None, eval_config)
+        optim_config_2 = OptimConfig(10, SGD, {"lr": 0.01}, None, None, eval_config)
         neb_configs = [
             NEBConfig(spring_constant, equal, {"count": 2}, 1, optim_config_1),
             NEBConfig(spring_constant, highest, {"count": 3, "key": "dense_train_loss"}, 1, optim_config_1),
@@ -162,13 +162,15 @@ class TestSuggestEngines(TestCase):
             return sum(node ** 2 for node in id_pair)
 
         unfinished_edge = (1, 3)
+        config = LandscapeExplorationConfig("value", "weight", [], None, AutoNEBConfig([None, None]))
 
         # Disconnect suggest
         correct_order = [
             (1, 2), (1, 3), (1, 4),
         ]
+        config.suggest_methods = [disconnected]
         while True:
-            pair = suggest_pair(graph, "value", "weight", [disconnected_suggest])
+            pair = suggest_pair(graph, config)
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "disconnected_suggest gives more pairs than necessary")
@@ -183,9 +185,9 @@ class TestSuggestEngines(TestCase):
         correct_order = [
             unfinished_edge
         ]
-        unfinished_suggest = create_unfinished_suggest(2)
+        config.suggest_methods = [unfinished]
         while True:
-            pair = suggest_pair(graph, "value", "weight", [unfinished_suggest])
+            pair = suggest_pair(graph, config)
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "unfinished_suggest gives more pairs than necessary")
@@ -198,8 +200,9 @@ class TestSuggestEngines(TestCase):
             (2, 4), (3, 4),  # Replace (1, 4)
             (2, 3),  # Replace (1, 3)
         ]
+        config.suggest_methods = [mst]
         while True:
-            pair = suggest_pair(graph, "value", "weight", [mst_suggest])
+            pair = suggest_pair(graph, config)
             if pair[0] is None:
                 break
             self.assertGreater(len(correct_order), 0, "mst_suggest gives more pairs than necessary")
@@ -211,5 +214,3 @@ class TestSuggestEngines(TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-    # suite = unittest.TestLoader().loadTestsFromTestCase(TestAlgorithms)
-    # unittest.TextTestRunner(verbosity=2).run(suite)

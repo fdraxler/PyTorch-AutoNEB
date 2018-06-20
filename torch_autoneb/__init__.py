@@ -9,7 +9,6 @@ from torch_autoneb.helpers import pbar
 from torch_autoneb.hyperparameters import NEBConfig, OptimConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.models import ModelWrapper
 from torch_autoneb.neb import NEB
-from torch_autoneb.suggest import suggest_pair
 
 __all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph"]
 
@@ -79,10 +78,10 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBConf
     if m2 in graph[m1]:
         existing_edges = graph[m1][m2]
         previous_cycle_idx = max(existing_edges[m1][m2])
-        previous_cycle_data = existing_edges[m1][m2][previous_cycle_idx]
+        connection_data = existing_edges[m1][m2][previous_cycle_idx]
         start_cycle_idx = previous_cycle_idx + 1
     else:
-        previous_cycle_data = {
+        connection_data = {
             "path_coords": torch.cat([graph.nodes[m]["coords"].view(1, -1) for m in (m1, m2)]),
             "target_distances": torch.ones(1)
         }
@@ -92,8 +91,25 @@ def auto_neb(m1, m2, graph: MultiGraph, model: ModelWrapper, config: AutoNEBConf
     # Run NEB and add to graph
     for cycle_idx in pbar(range(start_cycle_idx, config.cycle_count + 1), "AutoNEB"):
         cycle_config = config.neb_configs[cycle_idx - 1]
-        connection_data = neb(previous_cycle_data, model, cycle_config)
+        connection_data = neb(connection_data, model, cycle_config)
         graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
+
+
+def suggest_pair(graph: MultiGraph, config: LandscapeExplorationConfig):
+    engines_args = config.suggest_args
+    if engines_args is None:
+        engines_args = [{}] * len(config.suggest_methods)
+
+    for engine, engines_args in zip(config.suggest_methods, engines_args):
+        m1, m2 = engine(graph, config, **engines_args)
+        if m1 is None or m2 is None:
+            assert m1 is None and m2 is None
+        else:
+            if logger is not None:
+                logger.info("Connecting %d <-> %d based on %s." % (m1, m2, engine.__name__))
+            assert m1 is not m2
+            return m1, m2
+    return None, None
 
 
 def landscape_exploration(graph: MultiGraph, model: ModelWrapper, config: LandscapeExplorationConfig):
