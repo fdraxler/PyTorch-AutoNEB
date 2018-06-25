@@ -1,60 +1,24 @@
 import unittest
-from itertools import product, repeat
 from os import listdir
 from unittest import TestCase, skipUnless
 
 import torch
 from networkx import MultiGraph
 from os.path import join, dirname
-from torch import FloatTensor, LongTensor, normal, cuda
+from torch import cuda
 from torch.nn import NLLLoss
 from torch.optim import Adam, SGD
-from torch.utils.data import Dataset
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor, Pad, Compose
 from yaml import safe_load
 
+from main import setup_project, read_config_file
 from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
 from torch_autoneb.config import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.fill import equal, highest
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.suggest import disconnected, unfinished, mst
-
-
-class XORDataset(Dataset):
-    def __init__(self, train, transform=None, target_transform=None):
-        self.train = train
-
-        if train:
-            size = 500
-        else:
-            size = 100
-        each_size = size // 4
-        assert each_size * 4 == size
-
-        self.data = FloatTensor(size, 2)
-        self.target = LongTensor(size)
-        offset = 0
-        for x, y in product((-1, 1), (-1, 1)):
-            self.data[offset:offset + each_size] = normal(FloatTensor(list(repeat((x, y), each_size))), 0.2)
-            self.target[offset:offset + each_size] = 1 if x == y else 0
-            offset += each_size
-
-        self.transform = transform
-        self.target_transform = target_transform
-
-    def __len__(self):
-        return self.data.shape[0]
-
-    def __getitem__(self, index):
-        img = self.data[index]
-        if self.transform is not None:
-            img = self.transform(img)
-        target = self.target[index]
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        return img, target
 
 
 def _create_xor_model():
@@ -264,7 +228,7 @@ class TestModels(TestCase):
         self._test_model(resnet)
 
 
-class TestArguments(TestCase):
+class TestMain(TestCase):
     def test_parse_configs(self):
         base_dir = join(dirname(__file__), "configs")
         for config_file in listdir(base_dir):
@@ -273,6 +237,19 @@ class TestArguments(TestCase):
                     config_dict = safe_load(file)
                     config = LandscapeExplorationConfig.from_dict(config_dict["exploration"])
                     self.assertIsInstance(config, LandscapeExplorationConfig)
+
+    def test_project_management(self):
+        project_dirname = join(dirname(__file__), "tmp", "project")
+        config_file = join(dirname(__file__), "configs", "cifar10-resnet20.yaml")
+        setup_project(config_file, project_dirname)
+
+    def test_read_config(self):
+        config_file = join(dirname(__file__), "configs", "cifar10-resnet20.yaml")
+        model, minima_count, min_config, lex_config = read_config_file(config_file)
+        self.assertIsInstance(model, ModelWrapper)
+        self.assertGreater(minima_count, 0)
+        self.assertIsInstance(min_config, OptimConfig)
+        self.assertIsInstance(lex_config, LandscapeExplorationConfig)
 
 
 if __name__ == '__main__':

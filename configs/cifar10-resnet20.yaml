@@ -4,7 +4,7 @@ architecture:
   depth: 20
 
 # Minimisation
-minima-count: 10
+minima_count: 10
 minimum:
   nsteps: 64000
   algorithm:
@@ -12,17 +12,16 @@ minimum:
     lr: 0.1
   scheduler:
     name: MultiStepLR
-    args:
-      milestones:
-        - 32000
-        - 48000
+    milestones:
+      - 32000
+      - 48000
   eval:
-    batch-size: 128
+    batch_size: 128
 
 # Landscape exploration
 exploration:
-  value-key: train_loss
-  weight-key: saddle_train_loss
+  value_key: train_loss
+  weight_key: saddle_train_loss
   suggest:
     - unfinished
     - disconnected
@@ -33,8 +32,8 @@ exploration:
     - insert:
         name: equal
         count: 3
-      subsample-pivot-count: 9
-      spring-constant: inf
+      subsample_pivot_count: 9
+      spring_constant: inf
       optim:
         nsteps: 1000
         algorithm:
@@ -42,7 +41,7 @@ exploration:
           lr: 0.1
           momentum: 0.9
         eval:
-          batch-size: 512
+          batch_size: 512
     - insert:
         name: highest
         count: 2

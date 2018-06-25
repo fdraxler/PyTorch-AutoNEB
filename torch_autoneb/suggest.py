@@ -2,12 +2,12 @@ from logging import getLogger
 
 from networkx import MultiGraph, connected_components, minimum_spanning_tree, Graph
 
-from torch_autoneb import LandscapeExplorationConfig, to_simple_graph
+import torch_autoneb
 
 logger = getLogger(__name__)
 
 
-def unfinished(graph: MultiGraph, config: LandscapeExplorationConfig):
+def unfinished(graph: MultiGraph, config):
     """
     Find unfinished AutoNEB runs.
     """
@@ -31,7 +31,7 @@ def unfinished(graph: MultiGraph, config: LandscapeExplorationConfig):
     return None, None
 
 
-def disconnected(graph: MultiGraph, config: LandscapeExplorationConfig):
+def disconnected(graph: MultiGraph, config):
     """
     Find minima that are not connected to the global minimum.
     """
@@ -65,7 +65,7 @@ def disconnected(graph: MultiGraph, config: LandscapeExplorationConfig):
     return None, None
 
 
-def mst(graph: MultiGraph, config: LandscapeExplorationConfig):
+def mst(graph: MultiGraph, config):
     """
     Replace an existing edge with a "shortcut" via another node.
     """
@@ -74,7 +74,7 @@ def mst(graph: MultiGraph, config: LandscapeExplorationConfig):
     assert len(list(connected_components(graph))) == 1
     weight_key = config.weight_key
     value_key = config.value_key
-    simple_graph = to_simple_graph(graph, weight_key)
+    simple_graph = torch_autoneb.to_simple_graph(graph, weight_key)
     assert len(list(connected_components(simple_graph))) == 1
 
     # Find the highest connection in the mst
@@ -95,7 +95,7 @@ def mst(graph: MultiGraph, config: LandscapeExplorationConfig):
     return None, None
 
 
-def lowest(graph: MultiGraph, config: LandscapeExplorationConfig):
+def lowest(graph: MultiGraph, config):
     """
     Add all missing edges in the graph, prioritising minima with lower loss/energy.
     """

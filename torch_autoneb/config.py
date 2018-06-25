@@ -4,13 +4,10 @@ from torch import optim
 from torch.optim import lr_scheduler
 
 import torch_autoneb
+import torch_autoneb.suggest as suggest
 
 
-def _with_new_keys(config_dict: dict) -> dict:
-    return {key.replace("-", "_"): value for key, value in config_dict.items()}
-
-
-def _replace_instanciation(config, package):
+def replace_instanciation(config, package):
     if isinstance(config, dict):
         # Name + args
         name = config["name"]
@@ -37,7 +34,7 @@ class EvalConfig:
 
     @staticmethod
     def from_dict(config_dict: dict):
-        return EvalConfig(**_with_new_keys(config_dict))
+        return EvalConfig(**deepcopy(config_dict))
 
 
 class OptimConfig:
@@ -51,11 +48,11 @@ class OptimConfig:
 
     @staticmethod
     def from_dict(config_dict: dict):
-        config_dict = _with_new_keys(config_dict)
-        config_dict["algorithm_type"], config_dict["algorithm_args"] = _replace_instanciation(config_dict["algorithm"], optim)
+        config_dict = deepcopy(config_dict)
+        config_dict["algorithm_type"], config_dict["algorithm_args"] = replace_instanciation(config_dict["algorithm"], optim)
         del config_dict["algorithm"]
         if "scheduler" in config_dict:
-            config_dict["scheduler_type"], config_dict["scheduler_args"] = _replace_instanciation(config_dict["scheduler"], lr_scheduler)
+            config_dict["scheduler_type"], config_dict["scheduler_args"] = replace_instanciation(config_dict["scheduler"], lr_scheduler)
             del config_dict["scheduler"]
         else:
             config_dict["scheduler_type"], config_dict["scheduler_args"] = None, None
@@ -75,8 +72,8 @@ class NEBConfig:
 
     @staticmethod
     def from_dict(config_dict: dict):
-        config_dict = _with_new_keys(config_dict)
-        config_dict["insert_method"], config_dict["insert_args"] = _replace_instanciation(config_dict["insert"], torch_autoneb.fill)
+        config_dict = deepcopy(config_dict)
+        config_dict["insert_method"], config_dict["insert_args"] = replace_instanciation(config_dict["insert"], torch_autoneb.fill)
         config_dict["spring_constant"] = float(config_dict["spring_constant"])
         del config_dict["insert"]
         config_dict["optim_config"] = OptimConfig.from_dict(config_dict["optim"])
@@ -96,7 +93,7 @@ class AutoNEBConfig:
         current_state = {}
         cycles = []
         for cycle in configs_list:
-            _deep_update(current_state, _with_new_keys(cycle))
+            _deep_update(current_state, deepcopy(cycle))
             cycles.append(NEBConfig.from_dict(deepcopy(current_state)))
         return AutoNEBConfig(cycles)
 
@@ -111,8 +108,8 @@ class LandscapeExplorationConfig:
 
     @staticmethod
     def from_dict(config_dict: dict):
-        config_dict = _with_new_keys(config_dict)
-        config_dict["suggest_methods"], config_dict["suggest_args"] = zip(*[_replace_instanciation(engine, torch_autoneb.suggest) for engine in config_dict["suggest"]])
+        config_dict = deepcopy(config_dict)
+        config_dict["suggest_methods"], config_dict["suggest_args"] = zip(*[replace_instanciation(engine, suggest) for engine in config_dict["suggest"]])
         del config_dict["suggest"]
         config_dict["auto_neb_config"] = AutoNEBConfig.from_list(config_dict["autoneb"])
         del config_dict["autoneb"]

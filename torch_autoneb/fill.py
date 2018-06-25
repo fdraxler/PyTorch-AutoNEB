@@ -1,6 +1,6 @@
 import torch
 
-from torch_autoneb.neb import fill_chain
+import torch_autoneb.neb_model as neb_model
 
 
 def equal(previous_cycle_data, count):
@@ -13,7 +13,7 @@ def equal(previous_cycle_data, count):
     """
     path_coords = previous_cycle_data["path_coords"]
     weights = previous_cycle_data["target_distances"]
-    return fill_chain(path_coords, [torch.linspace(0, 1, count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
+    return neb_model.fill_chain(path_coords, [torch.linspace(0, 1, count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
 
 
 def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
@@ -74,4 +74,4 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
         else:
             fill.append([])
 
-    return fill_chain(path_coords, fill, weights)
+    return neb_model.fill_chain(path_coords, fill, weights)
