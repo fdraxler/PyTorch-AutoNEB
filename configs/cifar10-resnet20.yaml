@@ -41,7 +41,8 @@ exploration:
           name: SGD
           lr: 0.1
           momentum: 0.9
-        scheduler: null
+        eval:
+          batch-size: 512
     - insert:
         name: highest
         count: 2

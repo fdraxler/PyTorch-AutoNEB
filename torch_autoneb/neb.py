@@ -240,16 +240,15 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
     # Put each new item spaced by weights (measured along line) on the line
     last_idx = 0  # Index of previous pivot
     pos_prev = 0.  # Position of previous pivot on chain
-    pos_next = current_distances[last_idx]  # Position of next pivot on chain
+    pos_next = current_distances[last_idx].item()  # Position of next pivot on chain
     path_target[0] = path_source[0]
     for i in range(1, nimages - 1):
         position = target_positions[i - 1]
         while position > pos_next:
             last_idx += 1
             pos_prev = pos_next
-            pos_next += current_distances[last_idx]
+            pos_next += current_distances[last_idx].item()
 
-        # todo: bug pos_prev = pos_next sometimes
         t = (position - pos_prev) / (pos_next - pos_prev)
         path_target[i] = (t * path_source[last_idx + 1] + (1 - t) * path_source[last_idx])
     path_target[nimages - 1] = path_source[-1]

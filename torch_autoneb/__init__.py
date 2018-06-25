@@ -16,7 +16,7 @@ logger = getLogger(__name__)
 
 
 def find_minimum(model: ModelWrapper, config: OptimConfig) -> dict:
-    optimiser = config.optim_type(model.parameters(), **config.optim_args)  # type: optim.Optimizer
+    optimiser = config.algorithm_type(model.parameters(), **config.algorithm_args)  # type: optim.Optimizer
 
     # Wrap in scheduler
     if config.scheduler_type is not None:
@@ -52,7 +52,7 @@ def neb(previous_cycle_data, model: ModelWrapper, neb_config: NEBConfig) -> dict
 
     # Load optimiser
     optim_config = neb_config.optim_config
-    optimiser = optim_config.optim_type(neb_model.parameters(), **optim_config.optim_args)  # type: optim.Optimizer
+    optimiser = optim_config.algorithm_type(neb_model.parameters(), **optim_config.algorithm_args)  # type: optim.Optimizer
     if "weight_decay" in optimiser.defaults:
         assert optimiser.defaults["weight_decay"] == 0, "NEB is not compatible with weight decay on the optimiser. Set weight decay on NEB instead."
 
