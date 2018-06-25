@@ -240,7 +240,7 @@ class DataModel(Module):
             if dataset not in self.dataset_iters:
                 if dataset not in self.dataset_loaders:
                     # todo multi-threaded batch loading
-                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, shuffle=True, drop_last=True)
+                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=4)
                 loader = self.dataset_loaders[dataset]
                 self.dataset_iters[dataset] = iter(loader)
             iterator = self.dataset_iters[dataset]
