@@ -29,7 +29,7 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
 
     # Optimise
     for _ in helper.pbar(range(optim_config.nsteps), "Find mimimum"):
-        optimiser.zero_grad()
+        model.model.zero_grad()
         model.apply(gradient=True)
         optimiser.step()
     result = {
@@ -162,7 +162,7 @@ def to_simple_graph(graph: MultiGraph, weight_key: str) -> Graph:
     return simple_graph
 
 
-def load_pickle_graph(graph_file_name) -> MultiGraph:
+def load_pickle_graph(graph_file_name: str) -> MultiGraph:
     with open(graph_file_name, "rb") as file:
         graph = pickle.load(file)
 
@@ -170,3 +170,8 @@ def load_pickle_graph(graph_file_name) -> MultiGraph:
         if not isinstance(graph, MultiGraph):
             raise ValueError(f"{graph_file_name} does not contain a nx.MultiGraph")
     return graph
+
+
+def store_pickle_graph(graph: MultiGraph, graph_file_name: str):
+    with open(graph_file_name, "rb") as file:
+        pickle.dump(graph, file)

@@ -5,13 +5,14 @@ from shutil import copyfile
 
 from networkx import MultiGraph
 from os.path import isdir, isfile, join
+from torch.nn import NLLLoss
 from yaml import safe_load
 
-from torch_autoneb import load_pickle_graph, find_minimum, landscape_exploration, models
+from torch_autoneb import load_pickle_graph, find_minimum, landscape_exploration, models, store_pickle_graph
 from torch_autoneb.config import replace_instanciation, LandscapeExplorationConfig, OptimConfig
 from torch_autoneb.datasets import load_dataset
 from torch_autoneb.helpers import pbar
-from torch_autoneb.models import ModelWrapper
+from torch_autoneb.models import ModelWrapper, DataModel, CompareModel
 
 logger = getLogger(__name__)
 
@@ -22,10 +23,15 @@ def read_config_file(config_file: str):
 
     architecture, arguments = replace_instanciation(config["architecture"], models)
     if "dataset" in config:
-        dataset, input_size, output_size = load_dataset(config["dataset"])
+        datasets, input_size, output_size = load_dataset(config["dataset"])
         arguments["input_size"], arguments["output_size"] = input_size, output_size
+    else:
+        datasets = None
     model = architecture(**arguments)
+    if datasets is not None:
+        model = DataModel(CompareModel(model, NLLLoss()), datasets)
     model = ModelWrapper(model)
+    model.to(config["device"])
 
     minima_count = int(config["minima_count"])
     min_config = OptimConfig.from_dict(config["minimum"])
@@ -56,9 +62,13 @@ def main():
     for _ in pbar(range(len(graph.nodes), minima_count), "Finding minima"):
         minimum_data = find_minimum(model, min_config)
         graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **minimum_data)
+        store_pickle_graph(graph, graph_path)
 
     # === Connect minima ordered by suggestion algorithm ===
-    landscape_exploration(graph, model, lex_config)
+    try:
+        landscape_exploration(graph, model, lex_config)
+    finally:
+        store_pickle_graph(graph, graph_path)
 
 
 def setup_project(config_file, project_directory):
