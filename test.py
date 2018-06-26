@@ -13,8 +13,9 @@ from torchvision.transforms import ToTensor, Pad, Compose
 from yaml import safe_load
 
 from main import setup_project, read_config_file
-from torch_autoneb import OptimConfig, find_minimum, neb, suggest_pair, auto_neb
-from torch_autoneb.config import EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
+from torch_autoneb import find_minimum, neb, suggest_pair, auto_neb
+from torch_autoneb.config import OptimConfig, EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
+from torch_autoneb.datasets import XORDataset
 from torch_autoneb.fill import equal, highest
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet
 from torch_autoneb.models.mlp import MLP
@@ -240,11 +241,11 @@ class TestMain(TestCase):
 
     def test_project_management(self):
         project_dirname = join(dirname(__file__), "tmp", "project")
-        config_file = join(dirname(__file__), "configs", "cifar10-resnet20.yaml")
+        config_file = join(dirname(__file__), "configs", "test.yaml")
         setup_project(config_file, project_dirname)
 
     def test_read_config(self):
-        config_file = join(dirname(__file__), "configs", "cifar10-resnet20.yaml")
+        config_file = join(dirname(__file__), "configs", "test.yaml")
         model, minima_count, min_config, lex_config = read_config_file(config_file)
         self.assertIsInstance(model, ModelWrapper)
         self.assertGreater(minima_count, 0)

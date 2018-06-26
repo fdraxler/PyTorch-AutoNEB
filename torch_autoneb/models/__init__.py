@@ -71,7 +71,7 @@ class ModelWrapper(ModelInterface):
         self.model = model
         self.stored_parameters = list(self.model.parameters())
         # noinspection PyProtectedMember
-        self.stored_buffers = self.model._all_buffers()
+        self.stored_buffers = list(self.model._all_buffers())
         self.number_of_dimensions = sum(size for _, _, size, _ in self.iterate_params_buffers())
         device = self.stored_parameters[0].device
         self.coords = torch.empty(self.number_of_dimensions, dtype=torch.float32).to(device).zero_()

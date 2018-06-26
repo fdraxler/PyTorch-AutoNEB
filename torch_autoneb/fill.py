@@ -1,6 +1,7 @@
-import torch
+from itertools import chain
 
-import torch_autoneb.neb_model as neb_model
+import torch
+from torch import Tensor
 
 
 def equal(previous_cycle_data, count):
@@ -13,7 +14,7 @@ def equal(previous_cycle_data, count):
     """
     path_coords = previous_cycle_data["path_coords"]
     weights = previous_cycle_data["target_distances"]
-    return neb_model.fill_chain(path_coords, [torch.linspace(0, 1, count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
+    return fill_chain(path_coords, [torch.linspace(0, 1, count + 2)[1:-1]] * (path_coords.shape[0] - 1), weights)
 
 
 def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
@@ -74,4 +75,48 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
         else:
             fill.append([])
 
-    return neb_model.fill_chain(path_coords, fill, weights)
+    return fill_chain(path_coords, fill, weights)
+
+
+def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):
+    """
+    Extend a chain of coordinates by inserting additional items (through linear interpolation).
+
+    :param existing_chain: The current chain
+    :param insert_alphass: A list of float values in range (0, 1) specifying the relative position between each pair of pivots.
+    :param relative_lengths: The current relative lengths between pivots. New relative lengths are only returned when a tensor is passed.
+    :return:
+    """
+    existing_count = existing_chain.shape[0]
+    assert len(insert_alphass) == existing_count - 1, "For each connection in line, a number of new items must be specified!"
+
+    new_count = sum(map(len, insert_alphass)) + existing_count
+    new_chain = existing_chain.new(new_count, *existing_chain.shape[1:])
+    if relative_lengths is not None:
+        new_relative_lengths = relative_lengths.new(new_count - 1)
+
+    # Fill first position
+    new_chain[0] = existing_chain[0]
+    offset = 1
+    # Fill in missing positions
+    for i, insert_alphas in enumerate(insert_alphass):
+        start = existing_chain[i]
+        stop = existing_chain[i + 1]
+        if relative_lengths is not None:
+            section_weight = relative_lengths[i]
+
+        last_alpha = 0
+        for alpha in chain(insert_alphas, [1]):
+            assert alpha > last_alpha
+            # Position is linear interpolation
+            new_chain[offset] = (1 - alpha) * start + alpha * stop
+            if relative_lengths is not None:
+                # noinspection PyUnboundLocalVariable
+                new_relative_lengths[offset - 1] = (alpha - last_alpha) * section_weight
+            last_alpha = alpha
+            offset += 1
+
+    if relative_lengths is not None:
+        return new_chain, new_relative_lengths / sum(new_relative_lengths)
+    else:
+        return new_chain, None

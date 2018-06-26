@@ -11,7 +11,7 @@ from yaml import safe_load
 from torch_autoneb import load_pickle_graph, find_minimum, landscape_exploration, models, store_pickle_graph
 from torch_autoneb.config import replace_instanciation, LandscapeExplorationConfig, OptimConfig
 from torch_autoneb.datasets import load_dataset
-from torch_autoneb.helpers import pbar
+from torch_autoneb.helpers import pbar, move_to
 from torch_autoneb.models import ModelWrapper, DataModel, CompareModel
 
 logger = getLogger(__name__)
@@ -61,7 +61,7 @@ def main():
     # === Ensure the specified number of minima ===
     for _ in pbar(range(len(graph.nodes), minima_count), "Finding minima"):
         minimum_data = find_minimum(model, min_config)
-        graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **minimum_data)
+        graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **move_to(minimum_data, "cpu"))
         store_pickle_graph(graph, graph_path)
 
     # === Connect minima ordered by suggestion algorithm ===

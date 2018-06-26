@@ -33,7 +33,7 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
         model.apply(gradient=True)
         optimiser.step()
     result = {
-        "coords": model.get_coords(),
+        "coords": model.get_coords().to("cpu"),
     }
 
     # Analyse
@@ -67,8 +67,8 @@ def neb(previous_cycle_data, model: models.ModelWrapper, neb_config: config.NEBC
         neb_mod.apply(gradient=True)
         optimiser.step()
     result = {
-        "path_coords": neb_mod.path_coords.detach().clone(),
-        "target_distances": target_distances
+        "path_coords": neb_mod.path_coords.detach().clone().to("cpu"),
+        "target_distances": target_distances.to("cpu")
     }
 
     # Analyse
@@ -98,7 +98,7 @@ def auto_neb(m1, m2, graph: MultiGraph, model: models.ModelWrapper, config: conf
     for cycle_idx in helper.pbar(range(start_cycle_idx, config.cycle_count + 1), "AutoNEB"):
         cycle_config = config.neb_configs[cycle_idx - 1]
         connection_data = neb(connection_data, model, cycle_config)
-        graph.add_edge(m1, m2, key=cycle_idx, **connection_data)
+        graph.add_edge(m1, m2, key=cycle_idx, **helper.move_to(connection_data, "cpu"))
 
 
 def suggest_pair(graph: MultiGraph, config: config.LandscapeExplorationConfig):
@@ -173,5 +173,5 @@ def load_pickle_graph(graph_file_name: str) -> MultiGraph:
 
 
 def store_pickle_graph(graph: MultiGraph, graph_file_name: str):
-    with open(graph_file_name, "rb") as file:
+    with open(graph_file_name, "wb") as file:
         pickle.dump(graph, file)

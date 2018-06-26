@@ -149,3 +149,60 @@ class NEB(models.ModelInterface):
                 print(key)
 
         return analysis
+
+def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None, weights: Tensor = None, climbing_pivots: list = None):
+    """
+    Redistribute the pivots on the path so that they are spaced as given by the weights.
+    """
+    # Ensure storage for coordinates
+    if path_target is None:
+        path_target = path.new(nimages, path.shape[1])
+    else:
+        assert path_target is not path, "Source must be unequal to target for redistribution"
+        assert path_target.shape[0] == nimages
+    # Ensure weights
+    if weights is None:
+        weights = path.new(nimages - 1).fill_(1)
+    else:
+        assert len(weights.shape) == 1
+        assert weights.shape[0] == nimages - 1
+
+    # In climbing mode, reinterpolate only between the climbing images
+    if climbing_pivots is not None:
+        assert path.shape[0] == nimages, "Cannot change number of items when reinterpolating with respect to climbing images."
+        assert len(climbing_pivots) == nimages
+        assert all(isinstance(b, bool) for b in climbing_pivots), "Image must be climbing or not."
+        start = 0
+        for i, is_climbing in enumerate(climbing_pivots):
+            if is_climbing or i == nimages - 1:
+                distribute_by_weights(path[start:i + 1], i + 1 - start, path_target[start:i + 1], weights[start:i])
+                start = i
+        return path_target
+
+    if path is path_target:
+        # For the computation the original path is necessary
+        path_source = path.clone()
+    else:
+        path_source = path
+
+    # The current distances between elements on chain
+    current_distances = helpers.fast_inter_distance(path)
+    target_positions = (weights / weights.sum()).cumsum(0) * current_distances.sum()  # Target positions of elements (spaced by weights)
+
+    # Put each new item spaced by weights (measured along line) on the line
+    last_idx = 0  # Index of previous pivot
+    pos_prev = 0.  # Position of previous pivot on chain
+    pos_next = current_distances[last_idx].item()  # Position of next pivot on chain
+    path_target[0] = path_source[0]
+    for i in range(1, nimages - 1):
+        position = target_positions[i - 1]
+        while position > pos_next:
+            last_idx += 1
+            pos_prev = pos_next
+            pos_next += current_distances[last_idx].item()
+
+        t = (position - pos_prev) / (pos_next - pos_prev)
+        path_target[i] = (t * path_source[last_idx + 1] + (1 - t) * path_source[last_idx])
+    path_target[nimages - 1] = path_source[-1]
+
+    return path_target
