@@ -153,6 +153,11 @@ class NEB(models.ModelInterface):
             else:
                 print(key)
 
+        # Compute lengths
+        end_to_end_distance = (self.path_coords[-1] - self.path_coords[0]).norm(2)
+        analysis["lengths"] = (self.path_coords[1:] - self.path_coords[:-1]).norm(2, 1) / end_to_end_distance
+        analysis["length"] = end_to_end_distance
+
         return analysis
 
 
