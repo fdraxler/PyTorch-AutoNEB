@@ -53,7 +53,11 @@ def neb(previous_cycle_data, model: models.ModelWrapper, neb_config: config.NEBC
 
     # Load optimiser
     optim_config = neb_config.optim_config
+    # HACK: Optimisers only like parameters registered to autograd -> proper solution would keep several model instances as path and nudge their gradients after backward.
+    neb_mod.path_coords.requires_grad_(True)
     optimiser = optim_config.algorithm_type(neb_mod.parameters(), **optim_config.algorithm_args)  # type: optim.Optimizer
+    # HACK END: We don't want autograd to mingle with our computations
+    neb_mod.path_coords.requires_grad_(False)
     if "weight_decay" in optimiser.defaults:
         assert optimiser.defaults["weight_decay"] == 0, "NEB is not compatible with weight decay on the optimiser. Set weight decay on NEB instead."
 

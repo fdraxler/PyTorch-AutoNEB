@@ -1,3 +1,5 @@
+import os
+
 from torch import Tensor, linspace
 
 import torch_autoneb.config as config
@@ -14,7 +16,6 @@ class NEB(models.ModelInterface):
         """
         self.model = model
         self.path_coords = path_coords.clone()
-        self.path_coords.requires_grad_()
         self.path_coords.grad = path_coords.clone().zero_()
         self.target_distances = target_distances
         # This will raise an exception if gradients are computed
@@ -50,15 +51,19 @@ class NEB(models.ModelInterface):
         npivots = self.path_coords.shape[0]
         losses = self.path_coords.new(npivots)
 
+        def print_and_mem(str1):
+            if str1 == -3:
+                print(str1, memory_usage_psutil())
+
         # Redistribute if spring_constant == inf
         assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
         if gradient and self.spring_constant == float("inf"):
-            self.path_coords.data[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances).data
+            self.path_coords[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances).data
 
         # Compute losses (and gradients)
         for i in range(npivots):
             self.model.set_coords_no_grad(self.path_coords[i])
-            losses[i] = self.model.apply(gradient and (0 < i < npivots))
+            losses[i] = self.model.apply(gradient and (0 < i < npivots)).item()
             if gradient and (0 < i < npivots):
                 # If the coordinates were modified, move them back to the cache
                 self.path_coords[i] = self.model.get_coords(update_cache=True).detach()
@@ -66,18 +71,18 @@ class NEB(models.ModelInterface):
 
                 assert self.weight_decay >= 0
                 if self.weight_decay > 0:
-                    self.path_coords.grad[i] += self.weight_decay * self.path_coords[i].detach()
+                    self.path_coords.grad[i] += self.weight_decay * self.path_coords[i]
             else:
-                # Make sure no gradient is there
+                # Make sure no gradient is there on the endpoints
                 self.path_coords.grad[i].zero_()
 
         # Compute NEB gradients as in (Henkelmann & Jonsson, 2000)
         if gradient:
-            distances = helpers.fast_inter_distance(self.path_coords)
+            distances = (self.path_coords[:-1] - self.path_coords[1:]).norm(2, 1)
             for i in range(1, npivots - 1):
-                d_prev, d_next = distances[i - 1:i + 1]
-                td_prev, td_next = self.target_distances[i - 1:i + 1]
-                l_prev, loss, l_next = losses[i - 1:i + 2]
+                d_prev, d_next = distances[i - 1].item(), distances[i].item()
+                td_prev, td_next = self.target_distances[i - 1].item(), self.target_distances[i].item()
+                l_prev, loss, l_next = losses[i - 1].item(), losses[i].item(), losses[i + 1].item()
 
                 # Compute tangent
                 tangent = self.compute_tangent(d_next, d_prev, i, l_next, l_prev, loss)
@@ -90,7 +95,7 @@ class NEB(models.ModelInterface):
                     # Spring force parallel to tangent
                     self.path_coords.grad[i] += (d_prev - td_prev) - (d_next - td_next) * self.spring_constant * tangent
 
-        return losses.max()
+        return losses.max().item()
 
     def compute_tangent(self, d_next, d_prev, i, l_next, l_prev, loss):
         if l_prev < loss > l_next or l_prev > loss < l_next:
@@ -150,6 +155,7 @@ class NEB(models.ModelInterface):
 
         return analysis
 
+
 def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None, weights: Tensor = None, climbing_pivots: list = None):
     """
     Redistribute the pivots on the path so that they are spaced as given by the weights.
@@ -186,7 +192,7 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
         path_source = path
 
     # The current distances between elements on chain
-    current_distances = helpers.fast_inter_distance(path)
+    current_distances = (path_source[:-1] - path_source[1:]).norm(2, 1)
     target_positions = (weights / weights.sum()).cumsum(0) * current_distances.sum()  # Target positions of elements (spaced by weights)
 
     # Put each new item spaced by weights (measured along line) on the line
@@ -195,7 +201,7 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
     pos_next = current_distances[last_idx].item()  # Position of next pivot on chain
     path_target[0] = path_source[0]
     for i in range(1, nimages - 1):
-        position = target_positions[i - 1]
+        position = target_positions[i - 1].item()
         while position > pos_next:
             last_idx += 1
             pos_prev = pos_next
@@ -206,3 +212,11 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
     path_target[nimages - 1] = path_source[-1]
 
     return path_target
+
+
+def memory_usage_psutil():
+    # return the memory usage in MB
+    import psutil
+    process = psutil.Process(os.getpid())
+    mem = process.memory_full_info()[0] / float(2 ** 20)
+    return mem

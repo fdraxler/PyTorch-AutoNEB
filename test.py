@@ -17,7 +17,7 @@ from torch_autoneb import find_minimum, neb, suggest_pair, auto_neb
 from torch_autoneb.config import OptimConfig, EvalConfig, NEBConfig, AutoNEBConfig, LandscapeExplorationConfig
 from torch_autoneb.datasets import XORDataset
 from torch_autoneb.fill import equal, highest
-from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet
+from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet, Eggcarton
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.suggest import disconnected, unfinished, mst
 
@@ -251,6 +251,20 @@ class TestMain(TestCase):
         self.assertGreater(minima_count, 0)
         self.assertIsInstance(min_config, OptimConfig)
         self.assertIsInstance(lex_config, LandscapeExplorationConfig)
+
+
+class LimitTest(TestCase):
+    def test_long_run(self):
+        eggcarton = Eggcarton(100000)
+        model = ModelWrapper(eggcarton)
+        minima = [find_minimum(model, OptimConfig(1000, SGD, {"lr": 0.1}, None, None, None)) for _ in range(2)]
+
+        neb_optim_config = OptimConfig(1000, SGD, {"lr": 0.1}, None, None, None)
+        neb_config = NEBConfig(float("inf"), 1e-5, equal, {"count": 20}, 1, neb_optim_config)
+        neb({
+            "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
+            "target_distances": torch.ones(1)
+        }, model, neb_config)
 
 
 if __name__ == '__main__':

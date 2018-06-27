@@ -13,6 +13,7 @@ from torch_autoneb.models.cnn import CNN
 from torch_autoneb.models.densenet import DenseNet
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.models.resnet import ResNet
+from torch_autoneb.models.simple import Eggcarton
 
 
 class ModelInterface:
@@ -54,6 +55,8 @@ def param_init(mod: Module):
             mod.bias.data.zero_()
     elif isinstance(mod, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
         mod.reset_parameters()
+    elif hasattr(mod, "initialise_randomly"):
+        mod.initialise_randomly()
     elif len(mod._parameters) == 0:
         # Module has no parameters on its own
         pass
@@ -239,7 +242,6 @@ class DataModel(Module):
             # Make sure that there is a non-empty iterator
             if dataset not in self.dataset_iters:
                 if dataset not in self.dataset_loaders:
-                    # todo multi-threaded batch loading
                     self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=4)
                 loader = self.dataset_loaders[dataset]
                 self.dataset_iters[dataset] = iter(loader)
