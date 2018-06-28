@@ -1,4 +1,4 @@
-dataset: cifar10
+dataset: cifar100
 architecture:
   name: ResNet
   depth: 20

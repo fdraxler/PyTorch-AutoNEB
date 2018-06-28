@@ -1,24 +1,28 @@
-dataset: cifar10
+dataset: cifar100
 architecture:
-  name: ResNet
-  depth: 20
+  name: DenseNet
+  growth_rate: 12
+  depth: 40
+  reduction: 1
+  bottleneck: False
 device: cuda
 
 # Minimisation
 minima_count: 10
 minimum:
-  nsteps: 64000
+  nsteps: 250000
   algorithm:
     name: SGD
     lr: 0.1
     momentum: 0.9
+    nesterov: True
   scheduler:
     name: MultiStepLR
     milestones:
-      - 32000
-      - 48000
+      - 125000
+      - 187500
   eval:
-    batch_size: 128
+    batch_size: 64
 
 # Landscape exploration
 exploration:
@@ -43,7 +47,7 @@ exploration:
           lr: 0.1
           momentum: 0.9
         eval:
-          batch_size: 512
+          batch_size: 256
     - insert:
         name: highest
         count: 2

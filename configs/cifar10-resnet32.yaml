@@ -1,7 +1,7 @@
 dataset: cifar10
 architecture:
   name: ResNet
-  depth: 20
+  depth: 32
 device: cuda
 
 # Minimisation

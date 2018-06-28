@@ -1,7 +1,7 @@
 dataset: cifar10
 architecture:
   name: ResNet
-  depth: 20
+  depth: 56
 device: cuda
 
 # Minimisation
@@ -43,7 +43,7 @@ exploration:
           lr: 0.1
           momentum: 0.9
         eval:
-          batch_size: 512
+          batch_size: 256
     - insert:
         name: highest
         count: 2
