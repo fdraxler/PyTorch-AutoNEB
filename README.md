@@ -39,7 +39,7 @@ python main.py project_directory config_file
 ```
 
 where `project_directory` is the directory (need not exist) where the data should be stored.
-`config_file` should point to a .yaml file like the ones in [configs](configs).
+`config_file` should point to one of the `.yaml` files in [configs](configs).
 
 You can create new config files by editing an existing, such as `configs/cifar10-resnet20.yaml`.
 
