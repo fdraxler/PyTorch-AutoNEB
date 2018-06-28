@@ -255,7 +255,7 @@ class TestMain(TestCase):
 
 class LimitTest(TestCase):
     def test_long_run(self):
-        eggcarton = Eggcarton(100000)
+        eggcarton = Eggcarton(2)
         model = ModelWrapper(eggcarton)
         minima = [find_minimum(model, OptimConfig(1000, SGD, {"lr": 0.1}, None, None, None)) for _ in range(2)]
 

@@ -88,7 +88,7 @@ class ModelWrapper(ModelInterface):
         self._check_device()
 
     def parameters(self):
-        return self.model.parameters()
+        return self.stored_parameters
 
     def initialise_randomly(self):
         self.model.apply(param_init)
@@ -214,7 +214,7 @@ class ModelWrapper(ModelInterface):
         # Backpropation
         if gradient:
             loss.backward()
-        return loss
+        return loss.item()
 
     def analyse(self):
         self.model.eval()

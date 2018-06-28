@@ -22,7 +22,9 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
 
     # Wrap in scheduler
     if optim_config.scheduler_type is not None:
-        optimiser = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
+        scheduler = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
+    else:
+        scheduler = None
 
     # Initialise
     model.initialise_randomly()
@@ -32,7 +34,10 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
     for _ in helper.pbar(range(optim_config.nsteps), "Find mimimum"):
         model.model.zero_grad()
         model.apply(gradient=True)
+        if scheduler is not None:
+            scheduler.step()
         optimiser.step()
+        # todo tensorboard logging or similar
     result = {
         "coords": model.get_coords().to("cpu"),
     }

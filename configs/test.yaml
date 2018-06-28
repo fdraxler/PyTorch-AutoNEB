@@ -7,7 +7,7 @@ device: cuda
 # Minimisation
 minima_count: 10
 minimum:
-  nsteps: 10
+  nsteps: 1000
   algorithm:
     name: SGD
     lr: 0.1
