@@ -2,6 +2,7 @@ import operator
 from functools import reduce
 
 from torch.nn import Module, BatchNorm2d, ReLU, AvgPool2d, Conv2d, Linear, Sequential
+from torch.nn.functional import log_softmax
 
 """
 Adapted from https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py for the CIFAR10/CIFAR100 setting described in https://arxiv.org/abs/1512.03385.
@@ -112,5 +113,7 @@ class ResNet(Module):
         data = self.avgpool(data)
         data = data.reshape(data.shape[0], -1)
         data = self.linear_out(data)
+
+        data = log_softmax(data, 1)
 
         return data

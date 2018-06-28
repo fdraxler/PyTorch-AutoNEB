@@ -3,6 +3,7 @@ from collections import Iterable, OrderedDict
 from functools import reduce
 
 from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, LogSoftmax, Module
+from torch.nn.functional import log_softmax
 
 from torch_autoneb.helpers import ntuple
 
@@ -34,5 +35,5 @@ class MLP(Module):
             data = data.reshape(data.shape[0], -1)
         data = self.body(data)
         data = self.final(data)
-        data = self.softmax(data)
+        data = log_softmax(data)
         return data

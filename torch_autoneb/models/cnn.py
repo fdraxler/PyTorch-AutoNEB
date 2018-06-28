@@ -3,7 +3,8 @@ from collections import OrderedDict
 from functools import reduce
 
 from torch import Tensor, int64
-from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, LogSoftmax, Module, Conv2d, MaxPool2d, BatchNorm2d, Dropout2d
+from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, Module, Conv2d, MaxPool2d, BatchNorm2d, Dropout2d
+from torch.nn.functional import log_softmax
 
 from torch_autoneb.helpers import ntuple
 
@@ -62,12 +63,11 @@ class CNN(Module):
         self.conv = Sequential(conv_layers)
         self.fc = Sequential(dense_layers)
         self.final = Linear(previous_size, output_size)
-        self.softmax = LogSoftmax(dim=1)
 
     def forward(self, data):
         data = self.conv(data)
         data = data.reshape(data.shape[0], -1)
         data = self.fc(data)
         data = self.final(data)
-        data = self.softmax(data)
+        data = log_softmax(data, 1)
         return data

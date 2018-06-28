@@ -1,7 +1,9 @@
+import sys
 from argparse import ArgumentParser
-from logging import getLogger
+from logging import getLogger, StreamHandler, FileHandler, INFO
 from os import makedirs
 from shutil import copyfile
+from time import strftime
 
 from networkx import MultiGraph
 from os.path import isdir, isfile, join
@@ -9,7 +11,7 @@ from torch.nn import NLLLoss
 from yaml import safe_load
 
 from torch_autoneb import load_pickle_graph, find_minimum, landscape_exploration, models, store_pickle_graph
-from torch_autoneb.config import replace_instanciation, LandscapeExplorationConfig, OptimConfig
+from torch_autoneb.config import replace_instanciation, LandscapeExplorationConfig, OptimConfig, EvalConfig
 from torch_autoneb.datasets import load_dataset
 from torch_autoneb.helpers import pbar, move_to
 from torch_autoneb.models import ModelWrapper, DataModel, CompareModel
@@ -40,10 +42,23 @@ def read_config_file(config_file: str):
     return model, minima_count, min_config, lex_config
 
 
+def repair_graph(graph, model):
+    model.adapt_to_config(EvalConfig(1024))
+    for m in graph.nodes:
+        found_none = False
+        for value in graph.nodes[m].values():
+            if value is None:
+                found_none = True
+        if found_none:
+            graph.nodes[m].update(model.analyse())
+    return graph
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument("project_directory", nargs=1)
     parser.add_argument("config_file", nargs=1)
+    parser.add_argument("--no-backup", default=False, action="store_true")
     args = parser.parse_args()
 
     project_directory = args.project_directory[0]
@@ -52,23 +67,35 @@ def main():
 
     model, minima_count, min_config, lex_config = read_config_file(project_config_path)
 
+    # Setup Logger
+    root_logger = getLogger()
+    root_logger.setLevel(INFO)
+    root_logger.addHandler(StreamHandler(sys.stdout))
+    root_logger.addHandler(FileHandler(join(project_directory, "exploration.log")))
+
     # === Create/load graph ===
     if isfile(graph_path):
-        graph = load_pickle_graph(graph_path)
+        if not args.no_backup:
+            copyfile(graph_path, graph_path.replace(".p", f"_bak{strftime('%Y%m%d-%H%M')}.p"))
+        graph = repair_graph(load_pickle_graph(graph_path), model)
     else:
         graph = MultiGraph()
+
+    # Call this after every optmisiation
+    def save_callback():
+        store_pickle_graph(graph, graph_path)
 
     # === Ensure the specified number of minima ===
     for _ in pbar(range(len(graph.nodes), minima_count), "Finding minima"):
         minimum_data = find_minimum(model, min_config)
         graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **move_to(minimum_data, "cpu"))
-        store_pickle_graph(graph, graph_path)
+        save_callback()
 
     # === Connect minima ordered by suggestion algorithm ===
     try:
-        landscape_exploration(graph, model, lex_config)
+        landscape_exploration(graph, model, lex_config, callback=save_callback)
     finally:
-        store_pickle_graph(graph, graph_path)
+        save_callback()
 
 
 def setup_project(config_file, project_directory):

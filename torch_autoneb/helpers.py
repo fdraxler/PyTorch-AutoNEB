@@ -41,3 +41,5 @@ def move_to(something, target):
         return {key: move_to(value, target) for key, value in something.items()}
     elif isinstance(something, Tensor):
         return something.to(target)
+    else:
+        return something
