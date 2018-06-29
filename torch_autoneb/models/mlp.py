@@ -2,7 +2,7 @@ import operator
 from collections import Iterable, OrderedDict
 from functools import reduce
 
-from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, LogSoftmax, Module
+from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, Module
 from torch.nn.functional import log_softmax
 
 from torch_autoneb.helpers import ntuple
@@ -28,12 +28,11 @@ class MLP(Module):
             layers["layer_{i}".format(i=i)] = Sequential(layer)
         self.body = Sequential(layers)
         self.final = Linear(previous_size, output_size)
-        self.softmax = LogSoftmax(dim=1)
 
     def forward(self, data):
         if len(data.shape) > 2:
             data = data.reshape(data.shape[0], -1)
         data = self.body(data)
         data = self.final(data)
-        data = log_softmax(data)
+        data = log_softmax(data, 1)
         return data
