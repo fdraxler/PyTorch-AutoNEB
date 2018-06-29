@@ -56,8 +56,11 @@ class OptimConfig:
             del config_dict["scheduler"]
         else:
             config_dict["scheduler_type"], config_dict["scheduler_args"] = None, None
-        config_dict["eval_config"] = EvalConfig.from_dict(config_dict["eval"])
-        del config_dict["eval"]
+        if "eval" in config_dict:
+            config_dict["eval_config"] = EvalConfig.from_dict(config_dict["eval"])
+            del config_dict["eval"]
+        else:
+            config_dict["eval_config"] = None
         return OptimConfig(**config_dict)
 
 

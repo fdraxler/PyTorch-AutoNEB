@@ -1,50 +1,39 @@
-dataset: cifar10
 architecture:
-  name: ResNet
-  depth: 20
-device: cuda
+  name: Eggcarton
+device: cpu
 
 # Minimisation
-minima_count: 10
+minima_count: 3
 minimum:
   nsteps: 1000
   algorithm:
     name: SGD
-    lr: 0.1
-  scheduler:
-    name: MultiStepLR
-    milestones:
-      - 32000
-      - 48000
-  eval:
-    batch_size: 128
+    lr: 0.01
 
 # Landscape exploration
 exploration:
-  value_key: train_loss
-  weight_key: saddle_train_loss
+  value_key: loss
+  weight_key: saddle_loss
   suggest:
     - unfinished
     - disconnected
     - mst
   autoneb:
     # The first cycle should contain all information, subsequent cycles only _differences_ from the previous
-    # 4 times 1000 steps with lr=0.1
+    # 4 times 1000 steps with lr=0.01
     - insert:
         name: equal
         count: 3
       subsample_pivot_count: 1
       spring_constant: inf
       optim:
-        nsteps: 10
+        nsteps: 100
         algorithm:
           name: SGD
-          lr: 0.1
-          momentum: 0.9
-        eval:
-          batch_size: 512
+          lr: 0.001
     - insert:
         name: highest
         count: 2
-        key: dense_train_loss
+        key: dense_loss
+    - {} # same as previous
     - {} # same as previous

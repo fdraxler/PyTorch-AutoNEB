@@ -1,5 +1,3 @@
-import os
-
 from torch import Tensor, linspace
 
 import torch_autoneb.config as config
@@ -43,17 +41,14 @@ class NEB(models.ModelInterface):
 
         :param neb_config: The hyperparameters relevant for evaluating the model.
         """
-        self.model.adapt_to_config(neb_config.optim_config.eval_config)
+        if neb_config.optim_config.eval_config is not None:
+            self.model.adapt_to_config(neb_config.optim_config.eval_config)
         self.spring_constant = neb_config.spring_constant
         self.weight_decay = neb_config.weight_decay
 
     def apply(self, gradient=False, **kwargs):
         npivots = self.path_coords.shape[0]
         losses = self.path_coords.new(npivots)
-
-        def print_and_mem(str1):
-            if str1 == -3:
-                print(str1, memory_usage_psutil())
 
         # Redistribute if spring_constant == inf
         assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
@@ -63,11 +58,11 @@ class NEB(models.ModelInterface):
         # Compute losses (and gradients)
         for i in range(npivots):
             self.model.set_coords_no_grad(self.path_coords[i])
-            losses[i] = self.model.apply(gradient and (0 < i < npivots)).item()
+            losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):
                 # If the coordinates were modified, move them back to the cache
-                self.path_coords[i] = self.model.get_coords(update_cache=True).detach()
-                self.path_coords.grad[i] = self.model.get_grad(update_cache=False)
+                self.model.get_coords(update_cache=True, target=self.path_coords[i])
+                self.model.get_grad(update_cache=True, target=self.path_coords.grad[i])
 
                 assert self.weight_decay >= 0
                 if self.weight_decay > 0:
@@ -217,11 +212,3 @@ def distribute_by_weights(path: Tensor, nimages: int, path_target: Tensor = None
     path_target[nimages - 1] = path_source[-1]
 
     return path_target
-
-
-def memory_usage_psutil():
-    # return the memory usage in MB
-    import psutil
-    process = psutil.Process(os.getpid())
-    mem = process.memory_full_info()[0] / float(2 ** 20)
-    return mem

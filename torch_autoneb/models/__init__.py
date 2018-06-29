@@ -85,6 +85,8 @@ class ModelWrapper(ModelInterface):
 
     def to(self, *args, **kwargs):
         self.model.to(*args, **kwargs)
+        # noinspection PyProtectedMember
+        self.stored_buffers = list(self.model._all_buffers())
         self._check_device()
 
     def parameters(self):
@@ -93,16 +95,16 @@ class ModelWrapper(ModelInterface):
     def initialise_randomly(self):
         self.model.apply(param_init)
 
-    def iterate_params_buffers(self):
+    def iterate_params_buffers(self, gradient=False):
         offset = 0
         for param in self.stored_parameters:
             size = reduce(operator.mul, param.data.shape)
             data = param
-            yield offset, data.data, size, False
+            yield offset, data.data if not gradient else data.grad.data, size, False
             offset += size
         for buffer in self.stored_buffers:
             size = reduce(operator.mul, buffer.shape)
-            yield offset, buffer, size, True
+            yield offset, buffer if not gradient else None, size, True
             offset += size
 
     def _check_device(self):
@@ -126,15 +128,24 @@ class ModelWrapper(ModelInterface):
         self._check_device()
 
         final = 0
-        for offset, data, size, is_buffer in self.iterate_params_buffers():
+        for offset, tensor, size, is_buffer in self.iterate_params_buffers():
             # Copy coordinates
-            self.coords[offset:offset + size] = data.detach().view(-1)
+            self.coords[offset:offset + size] = tensor.data.view(-1)
 
+            # Size consistency check
+            final = final + size
+        assert final == self.coords.shape[0]
+
+    def _grad_to_cache(self):
+        self._check_device()
+
+        final = 0
+        for offset, tensor, size, is_buffer in self.iterate_params_buffers(True):
             # Copy gradient
-            if data.grad is None:
+            if tensor is None:
                 self.coords.grad[offset:offset + size] = 0
             else:
-                self.coords.grad[offset:offset + size] = data.grad.detach().view(-1)
+                self.coords.grad[offset:offset + size] = tensor.data.view(-1)
 
             # Size consistency check
             final = final + size
@@ -146,10 +157,10 @@ class ModelWrapper(ModelInterface):
 
         :param target: If given, copy the data to this destination.
         :param copy: Copy the data before returning it.
-        :param update_cache: Before copying, retrieve the current coordinates from the model. Set `False` if you are sure that they have been retrieved before.
+        :param update_cache: Before copying, retrieve the current coordinates from the model. Set `False` only if you are sure that they have been retrieved before.
         :return: A tensor holding the coordinates.
         """
-        assert target is None or not copy, "Must copy if target is specified"
+        assert target is None or copy, "Must copy if target is specified"
 
         if update_cache:
             self._coords_to_cache()
@@ -169,13 +180,13 @@ class ModelWrapper(ModelInterface):
 
         :param target:
         :param copy:
-        :param update_cache:
+        :param update_cache: Before copying, retrieve the current gradient from the model. Set `False` only if you are sure that it has been retrieved before.
         :return:
         """
-        assert target is None or not copy, "Must copy if target is specified"
+        assert target is None or copy, "Must copy if target is specified"
 
         if update_cache:
-            self._coords_to_cache()
+            self._grad_to_cache()
 
         if target is None:
             if copy:
@@ -205,6 +216,7 @@ class ModelWrapper(ModelInterface):
     def apply(self, gradient=False, **kwargs):
         # Forward data -> loss
         if gradient:
+            self.model.zero_grad()
             self.model.train()
         else:
             self.model.eval()

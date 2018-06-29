@@ -12,13 +12,16 @@ class SimpleEnergy(Module):
     def forward(self):
         raise NotImplementedError
 
+    def initialise_randomly(self):
+        raise NotImplementedError
+
     def analyse(self):
         return {"loss": self.forward().item()}
 
 
 class Eggcarton(SimpleEnergy):
     def forward(self):
-        return (self.location * (2 * pi)).cos().mean()
+        return (self.location * (2 * pi)).cos().sum()
 
     def initialise_randomly(self):
-        self.location.data.uniform_(-1, 1)
+        self.location.data.uniform_(-2, 2)

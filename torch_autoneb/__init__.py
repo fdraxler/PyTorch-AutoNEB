@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -> dict:
     optimiser = optim_config.algorithm_type(model.parameters(), **optim_config.algorithm_args)  # type: optim.Optimizer
 
-    # Wrap in scheduler
+    # Scheduler
     if optim_config.scheduler_type is not None:
         scheduler = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
     else:
@@ -28,11 +28,11 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
 
     # Initialise
     model.initialise_randomly()
-    model.adapt_to_config(optim_config.eval_config)
+    if optim_config.eval_config is not None:
+        model.adapt_to_config(optim_config.eval_config)
 
     # Optimise
     for _ in helper.pbar(range(optim_config.nsteps), "Find mimimum"):
-        model.model.zero_grad()
         model.apply(gradient=True)
         if scheduler is not None:
             scheduler.step()
@@ -67,17 +67,20 @@ def neb(previous_cycle_data, model: models.ModelWrapper, neb_config: config.NEBC
     if "weight_decay" in optimiser.defaults:
         assert optimiser.defaults["weight_decay"] == 0, "NEB is not compatible with weight decay on the optimiser. Set weight decay on NEB instead."
 
-    # Wrap in scheduler
+    # Scheduler
     if optim_config.scheduler_type is not None:
-        optimiser = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
+        scheduler = optim_config.scheduler_type(optimiser, **optim_config.scheduler_args)
+    else:
+        scheduler = None
 
     # Optimise
     for _ in helper.pbar(range(optim_config.nsteps), "NEB"):
-        # optimiser.zero_grad()  # has no effect, is overwritten anyway
         neb_mod.apply(gradient=True)
+        if scheduler is not None:
+            scheduler.step()
         optimiser.step()
     result = {
-        "path_coords": neb_mod.path_coords.detach().clone().to("cpu"),
+        "path_coords": neb_mod.path_coords.clone().to("cpu"),
         "target_distances": target_distances.to("cpu")
     }
 
@@ -93,8 +96,8 @@ def auto_neb(m1, m2, graph: MultiGraph, model: models.ModelWrapper, config: conf
     # Continue existing cycles or start from scratch
     if m2 in graph[m1]:
         existing_edges = graph[m1][m2]
-        previous_cycle_idx = max(existing_edges[m1][m2])
-        connection_data = existing_edges[m1][m2][previous_cycle_idx]
+        previous_cycle_idx = max(existing_edges)
+        connection_data = graph[m1][m2][previous_cycle_idx]
         start_cycle_idx = previous_cycle_idx + 1
     else:
         connection_data = {

@@ -204,8 +204,12 @@ class TestModels(TestCase):
         model.adapt_to_config(EvalConfig(1024))
 
         if cuda.is_available():
-            model.to("cuda")
+            pass  # model.to("cuda")
         analysis = model.analyse()
+
+        for offset, data, size, is_buffer in model.iterate_params_buffers():
+            print(size)
+
         for key, value in analysis.items():
             if "error" in key:
                 self.assertLess(self.random_error * 0.9, value, f"Random {key} too low")
