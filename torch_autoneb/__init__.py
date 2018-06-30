@@ -11,8 +11,9 @@ import torch_autoneb.fill as fill
 import torch_autoneb.helpers as helper
 import torch_autoneb.models as models
 import torch_autoneb.neb_model as neb_model
+import torch_autoneb.visualise as visualise
 
-__all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph", "config", "helper", "models", "neb_model", "fill"]
+__all__ = ["find_minimum", "neb", "auto_neb", "landscape_exploration", "load_pickle_graph", "config", "helper", "models", "neb_model", "fill", "visualise"]
 
 logger = getLogger(__name__)
 
@@ -157,7 +158,7 @@ def landscape_exploration(graph: MultiGraph, model: models.ModelWrapper, lex_con
         logger.info(f"Average loss in MST: {mean_saddle_loss}.")
 
 
-def to_simple_graph(graph: MultiGraph, weight_key: str) -> Graph:
+def to_simple_graph(graph: MultiGraph, weight_key: str, cycle_count: int=None) -> Graph:
     """
     Reduce the MultiGraph to a simple graph by reducing each multi-edge
     to its lowest container.
@@ -168,6 +169,9 @@ def to_simple_graph(graph: MultiGraph, weight_key: str) -> Graph:
 
     for m1 in graph:
         for m2 in graph[m1]:
+            if cycle_count is not None and len(graph[m1][m2]) < cycle_count:
+                continue
+            
             best_edge_key = min(graph[m1][m2], key=lambda key: graph[m1][m2][key][weight_key])
             best_edge_data = graph[m1][m2][best_edge_key]
             best_edge_data["cycle_idx"] = best_edge_key

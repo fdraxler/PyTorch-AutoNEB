@@ -144,7 +144,7 @@ class NEB(models.ModelInterface):
         # Compute saddle values
         for key, value in list(analysis.items()):
             if len(value.shape) == 1 or value.shape[1] == 1:
-                analysis[key.replace("dense_", "saddle_")] = value.max()
+                analysis[key.replace("dense_", "saddle_")] = value.max().item()
             else:
                 print(key)
 
