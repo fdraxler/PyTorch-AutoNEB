@@ -10,7 +10,7 @@ from torch_autoneb.helpers import ntuple
 
 
 class CNN(Module):
-    def __init__(self, conv_depth, num_filters, filter_size, padding_size, pool_size, pool_every, dense_depth, num_dense_units, input_size, output_size, batch_norm=True, dropout=0):
+    def __init__(self, conv_depth, num_filters, filter_size, padding_size, pool_size, dense_depth, num_dense_units, input_size, output_size, pool_every=1, batch_norm=True, dropout=0):
         super().__init__()
 
         # Need to keep track of dimensions to know which linear layer we need later
