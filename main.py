@@ -19,7 +19,7 @@ from torch_autoneb.models import ModelWrapper, DataModel, CompareModel
 logger = getLogger(__name__)
 
 
-def read_config_file(config_file: str, move_to_device: bool=True):
+def read_config_file(config_file: str, move_to_device: bool = True):
     with open(config_file, "r") as file:
         config = safe_load(file)
 
@@ -77,7 +77,10 @@ def main():
     # === Create/load graph ===
     if isfile(graph_path):
         if not args.no_backup:
+            root_logger.info("Copy current 'graph.p' to backup file")
             copyfile(graph_path, graph_path.replace(".p", f"_bak{strftime('%Y%m%d-%H%M')}.p"))
+        else:
+            root_logger.info("Not creating a backup of 'graph.p' because of user request.")
         graph = repair_graph(load_pickle_graph(graph_path), model)
     else:
         graph = MultiGraph()
@@ -92,11 +95,8 @@ def main():
         graph.add_node(max(graph.nodes) + 1 if len(graph.nodes) > 0 else 1, **move_to(minimum_data, "cpu"))
         save_callback()
 
-    # === Connect minima ordered by suggestion algorithm ===
-    try:
-        landscape_exploration(graph, model, lex_config, callback=save_callback)
-    finally:
-        save_callback()
+    # === Connect minima ===
+    landscape_exploration(graph, model, lex_config, callback=save_callback)
 
 
 def setup_project(config_file, project_directory):

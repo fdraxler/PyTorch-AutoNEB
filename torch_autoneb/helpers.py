@@ -1,3 +1,4 @@
+import logging
 from itertools import repeat
 
 import collections
@@ -21,6 +22,8 @@ except ModuleNotFoundError:
 
         def update(self, N=None):
             pass
+
+logger = logging.getLogger(__name__)
 
 
 def ntuple(x, n):

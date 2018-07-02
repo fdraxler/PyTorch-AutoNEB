@@ -14,9 +14,10 @@ class NEB(models.ModelInterface):
         """
         self.model = model
         self.path_coords = path_coords.clone()
-        self.path_coords.grad = path_coords.clone().zero_()
         self.target_distances = target_distances
-        # This will raise an exception if gradients are computed
+        self._check_device()
+        
+        # This will raise an exception if gradients are computed without adapt_to_config() being called
         self.spring_constant = -1
         self.weight_decay = -1
 
@@ -30,7 +31,16 @@ class NEB(models.ModelInterface):
     def _check_device(self):
         new_device = self.model.stored_parameters[0].device
         if new_device != self.path_coords.device:
+            previous = self.path_coords
             self.path_coords = self.path_coords.to(new_device)
+            if self.path_coords.grad is not None:
+                self.path_coords.grad = previous.grad.to(new_device)
+            if self.target_distances is not None:
+                self.target_distances = self.target_distances.to(new_device)
+    
+    def _assert_grad(self):
+        if self.path_coords.grad is None:
+            self.path_coords.grad = self.path_coords.new(self.path_coords.shape).zero_()
 
     def parameters(self):
         return [self.path_coords]
@@ -54,9 +64,14 @@ class NEB(models.ModelInterface):
         assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
         if gradient and self.spring_constant == float("inf"):
             self.path_coords[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances).data
+        
+        # Assert gradient storage is available
+        if gradient:
+            self._assert_grad()
 
         # Compute losses (and gradients)
         for i in range(npivots):
+            #print("!!!", i, "!!!")
             self.model.set_coords_no_grad(self.path_coords[i])
             losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):
@@ -67,7 +82,7 @@ class NEB(models.ModelInterface):
                 assert self.weight_decay >= 0
                 if self.weight_decay > 0:
                     self.path_coords.grad[i] += self.weight_decay * self.path_coords[i]
-            else:
+            elif gradient:
                 # Make sure no gradient is there on the endpoints
                 self.path_coords.grad[i].zero_()
 
@@ -117,7 +132,7 @@ class NEB(models.ModelInterface):
         analysis = {}
 
         dense_pivot_count = (self.path_coords.shape[0] - 1) * (sub_pivot_count + 1) + 1
-        alphas = linspace(0, 1, sub_pivot_count + 2)[:-1]
+        alphas = linspace(0, 1, sub_pivot_count + 2)[:-1].to(self.path_coords.device)
         for i in helpers.pbar(range(dense_pivot_count), "Saddle analysis"):
             base_pivot = i // (sub_pivot_count + 1)
             sub_pivot = i % (sub_pivot_count + 1)

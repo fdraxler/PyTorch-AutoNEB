@@ -1,6 +1,8 @@
 import gzip
+import os
 import pickle
 from logging import getLogger
+from time import sleep
 
 import torch
 from networkx import MultiGraph, Graph, minimum_spanning_tree
@@ -158,7 +160,7 @@ def landscape_exploration(graph: MultiGraph, model: models.ModelWrapper, lex_con
         logger.info(f"Average loss in MST: {mean_saddle_loss}.")
 
 
-def to_simple_graph(graph: MultiGraph, weight_key: str, cycle_count: int=None) -> Graph:
+def to_simple_graph(graph: MultiGraph, weight_key: str, cycle_count: int = None) -> Graph:
     """
     Reduce the MultiGraph to a simple graph by reducing each multi-edge
     to its lowest container.
@@ -171,7 +173,7 @@ def to_simple_graph(graph: MultiGraph, weight_key: str, cycle_count: int=None) -
         for m2 in graph[m1]:
             if cycle_count is not None and len(graph[m1][m2]) < cycle_count:
                 continue
-            
+
             best_edge_key = min(graph[m1][m2], key=lambda key: graph[m1][m2][key][weight_key])
             best_edge_data = graph[m1][m2][best_edge_key]
             best_edge_data["cycle_idx"] = best_edge_key
@@ -193,6 +195,14 @@ def load_pickle_graph(graph_file_name: str) -> MultiGraph:
 
 
 def store_pickle_graph(graph: MultiGraph, graph_file_name: str):
+    # In case the writing is interrupted, first write to a temporary file
     open_fn = gzip.open if graph_file_name.endswith(".gz") else open
-    with open_fn(graph_file_name, "wb") as file:
+    directory, filename = os.path.split(graph_file_name)
+    with open_fn(os.path.join(directory, "~" + filename), "wb") as file:
+        print("NOW!!!")
+        sleep(10)
         pickle.dump(graph, file)
+        print("Done.")
+
+    # Then overwrite the old file
+    os.rename(os.path.join(directory, "~" + filename), graph_file_name)
