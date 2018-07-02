@@ -1,4 +1,5 @@
 from copy import deepcopy
+from collections import Iterable
 
 from torch import optim
 from torch.optim import lr_scheduler
@@ -27,8 +28,33 @@ def _deep_update(source: dict, target: dict):
         else:
             source[key] = value
 
+class BaseConfig:
+    def value_string(self, level=0):
+        value_string = self.__class__.__name__ + "["
+        for key, value in self.__dict__.items():
+            value_string += "\n" + "  " * (level + 1) + key + ": "
+            if isinstance(value, BaseConfig):
+                value_string += value.value_string(level + 1)
+            elif isinstance(value, (list, tuple)):
+                value_string += "["
+                for sub_value in value:
+                    value_string += "\n" + "  " * (level + 2)
+                    if isinstance(sub_value, BaseConfig):
+                        value_string += sub_value.value_string(level + 2)
+                    else:
+                        value_string += str(sub_value)
+                    value_string += ","
+                value_string += "\n" + "  " * (level + 1) + "]"
+            else:
+                value_string += str(value)
+        value_string += "\n" + "  " * level + "]"
+        return value_string
+    
+    def __repr__(self):
+        return self.value_string()
 
-class EvalConfig:
+
+class EvalConfig(BaseConfig):
     def __init__(self, batch_size: int):
         self.batch_size = batch_size
 
@@ -37,7 +63,7 @@ class EvalConfig:
         return EvalConfig(**deepcopy(config_dict))
 
 
-class OptimConfig:
+class OptimConfig(BaseConfig):
     def __init__(self, nsteps: int, algorithm_type, algorithm_args: dict, scheduler_type, scheduler_args: dict, eval_config: EvalConfig):
         self.nsteps = nsteps
         self.algorithm_type = algorithm_type
@@ -64,7 +90,7 @@ class OptimConfig:
         return OptimConfig(**config_dict)
 
 
-class NEBConfig:
+class NEBConfig(BaseConfig):
     def __init__(self, spring_constant: float, weight_decay: float, insert_method: callable, insert_args: dict, subsample_pivot_count: int, optim_config: OptimConfig):
         self.spring_constant = spring_constant
         self.weight_decay = weight_decay
@@ -86,7 +112,7 @@ class NEBConfig:
         return NEBConfig(**config_dict)
 
 
-class AutoNEBConfig:
+class AutoNEBConfig(BaseConfig):
     def __init__(self, neb_configs: list):
         self.cycle_count = len(neb_configs)
         self.neb_configs = neb_configs
@@ -101,7 +127,7 @@ class AutoNEBConfig:
         return AutoNEBConfig(cycles)
 
 
-class LandscapeExplorationConfig:
+class LandscapeExplorationConfig(BaseConfig):
     def __init__(self, value_key: str, weight_key: str, suggest_methods: list, suggest_args: list, auto_neb_config: AutoNEBConfig):
         self.value_key = value_key
         self.weight_key = weight_key

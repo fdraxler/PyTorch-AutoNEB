@@ -19,7 +19,7 @@ from torch_autoneb.models import ModelWrapper, DataModel, CompareModel
 logger = getLogger(__name__)
 
 
-def read_config_file(config_file: str):
+def read_config_file(config_file: str, move_to_device: bool=True):
     with open(config_file, "r") as file:
         config = safe_load(file)
 
@@ -33,7 +33,8 @@ def read_config_file(config_file: str):
     if datasets is not None:
         model = DataModel(CompareModel(model, NLLLoss()), datasets)
     model = ModelWrapper(model)
-    model.to(config["device"])
+    if move_to_device:
+        model.to(config["device"])
 
     minima_count = int(config["minima_count"])
     min_config = OptimConfig.from_dict(config["minimum"])
