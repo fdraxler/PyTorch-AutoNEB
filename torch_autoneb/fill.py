@@ -32,7 +32,10 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
     path_coords = previous_cycle_data["path_coords"]
     weights = previous_cycle_data["target_distances"]
     dense_data = previous_cycle_data[key]
-
+    
+    if count == 0:
+        return path_coords, weights
+    
     assert (dense_data.shape[0] - 1) % (path_coords.shape[0] - 1) == 0, f"Bad shape of dense data {dense_data.shape}."
     assert float("nan") not in dense_data
 
@@ -75,7 +78,9 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
         else:
             fill.append([])
 
-    return fill_chain(path_coords, fill, weights)
+    a, b = fill_chain(path_coords, fill, weights)
+    print(path_coords.shape[0], "+", count, "=", a.shape[0])
+    return a, b
 
 
 def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):
