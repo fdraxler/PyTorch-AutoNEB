@@ -16,7 +16,7 @@ class NEB(models.ModelInterface):
         self.path_coords = path_coords.clone()
         self.target_distances = target_distances
         self._check_device()
-        
+
         # This will raise an exception if gradients are computed without adapt_to_config() being called
         self.spring_constant = -1
         self.weight_decay = -1
@@ -37,7 +37,7 @@ class NEB(models.ModelInterface):
                 self.path_coords.grad = previous.grad.to(new_device)
             if self.target_distances is not None:
                 self.target_distances = self.target_distances.to(new_device)
-    
+
     def _assert_grad(self):
         if self.path_coords.grad is None:
             self.path_coords.grad = self.path_coords.new(self.path_coords.shape).zero_()
@@ -64,14 +64,13 @@ class NEB(models.ModelInterface):
         assert self.target_distances is not None or not gradient, "Cannot compute gradient if target distances are unavailable"
         if gradient and self.spring_constant == float("inf"):
             self.path_coords[:] = distribute_by_weights(self.path_coords, self.path_coords.shape[0], weights=self.target_distances).data
-        
+
         # Assert gradient storage is available
         if gradient:
             self._assert_grad()
 
         # Compute losses (and gradients)
         for i in range(npivots):
-            #print("!!!", i, "!!!")
             self.model.set_coords_no_grad(self.path_coords[i])
             losses[i] = self.model.apply(gradient and (0 < i < npivots))
             if gradient and (0 < i < npivots):

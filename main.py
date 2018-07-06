@@ -77,7 +77,7 @@ def main():
     # === Create/load graph ===
     if isfile(graph_path):
         if not args.no_backup:
-            root_logger.info("Copy current 'graph.p' to backup file")
+            root_logger.info("Copying current 'graph.p' to backup file.")
             copyfile(graph_path, graph_path.replace(".p", f"_bak{strftime('%Y%m%d-%H%M')}.p"))
         else:
             root_logger.info("Not creating a backup of 'graph.p' because of user request.")
@@ -122,7 +122,7 @@ def setup_project(config_file, project_directory):
         with open(config_file, "r") as file:
             original_config = safe_load(file)
         if project_config != original_config:
-            raise ValueError(f"Config file 'config.yaml' in project directory is structurally different from original config '{config_file}'")
+            raise ValueError(f"Config file 'config.yaml' in project directory is structurally different from original config '{config_file}'.")
     return graph_path, project_config_path
 
 

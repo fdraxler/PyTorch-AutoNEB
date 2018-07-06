@@ -247,6 +247,9 @@ class DataModel(Module):
 
     def adapt_to_config(self, config: EvalConfig):
         self.batch_size = config.batch_size
+        self.dataset_iters = {}
+        if hasattr(self.model, "adapt_to_config"):
+            self.model.adapt_to_config(config)
 
     def forward(self, dataset="train", **kwargs):
         # Retrieve batch
@@ -266,7 +269,8 @@ class DataModel(Module):
                 del self.dataset_iters[dataset]
 
         # Apply model on batch and use returned loss
-        return self.model(*self.batch_to_device(batch), **kwargs)
+        device_batch = self.batch_to_device(batch)
+        return self.model(*device_batch, **kwargs)
 
     def batch_to_device(self, batch):
         device = list(self.model.parameters())[0].device

@@ -83,6 +83,10 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
     return a, b
 
 
+def leave(previous_cycle_data: dict, **kwargs):
+    return previous_cycle_data["path_coords"], previous_cycle_data["target_distances"]
+
+
 def fill_chain(existing_chain: Tensor, insert_alphass: list, relative_lengths: Tensor = None):
     """
     Extend a chain of coordinates by inserting additional items (through linear interpolation).

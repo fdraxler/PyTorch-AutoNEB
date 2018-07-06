@@ -1,0 +1,77 @@
+dataset: cifar10
+architecture:
+  name: DenseNet
+  growth_rate: 12
+  depth: 100
+  reduction: 0.5
+  bottleneck: True
+device: cuda
+
+# Minimisation
+minima_count: 10
+minimum:
+  nsteps: 25
+  algorithm:
+    name: SGD
+    lr: 0.1
+    momentum: 0.9
+    nesterov: True
+  scheduler:
+    name: MultiStepLR
+    milestones:
+      - 125000
+      - 187500
+  eval:
+    batch_size: 64
+
+# Landscape exploration
+exploration:
+  value_key: train_loss
+  weight_key: saddle_train_loss
+  suggest:
+    - unfinished
+    - disconnected
+    - mst
+  autoneb:
+    # The first cycle should contain all information, subsequent cycles only _differences_ from the previous
+    # 4 times 1000 steps with lr=0.1
+    - insert:
+        name: equal
+        count: 3
+      subsample_pivot_count: 9
+      spring_constant: inf
+      weight_decay: 0.0001
+      optim:
+        nsteps: 1000
+        algorithm:
+          name: SGD
+          lr: 0.1
+          momentum: 0.9
+        eval:
+          batch_size: 256
+    - insert:
+        name: highest
+        count: 2
+        key: dense_train_loss
+    - {} # same as previous
+    - {}
+    # 2 times 2000 steps with lr=0.1
+    - optim:
+        nsteps: 2000
+    - {}
+    # 4 times lr=0.01
+    - optim:
+        nsteps: 1000
+        algorithm:
+          lr: 0.01
+    - {}
+    - {}
+    - {}
+    # 4 times lr=0.001
+    - optim:
+        algorithm:
+          lr: 0.001
+    - {}
+    - {}
+    - {}
+

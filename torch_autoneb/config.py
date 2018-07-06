@@ -1,5 +1,4 @@
 from copy import deepcopy
-from collections import Iterable
 
 from torch import optim
 from torch.optim import lr_scheduler
@@ -94,8 +93,8 @@ class NEBConfig(BaseConfig):
     def __init__(self, spring_constant: float, weight_decay: float, insert_method: callable, insert_args: dict, subsample_pivot_count: int, optim_config: OptimConfig):
         self.spring_constant = spring_constant
         self.weight_decay = weight_decay
-        self.insert_args = insert_args
         self.insert_method = insert_method
+        self.insert_args = insert_args
         self.subsample_pivot_count = subsample_pivot_count
         self.optim_config = optim_config
 
