@@ -4,6 +4,7 @@ except:
     pass
 import networkx as nx
 
+
 def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
     # Determine value range
     nodelist = list(graph)

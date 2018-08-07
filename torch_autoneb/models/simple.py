@@ -25,3 +25,35 @@ class Eggcarton(SimpleEnergy):
 
     def initialise_randomly(self):
         self.location.data.uniform_(-2, 2)
+
+
+class CurvyValley(SimpleEnergy):
+    def __init__(self):
+        super().__init__()
+
+        self.alpha = 1
+        self.x0 = (5 / 2 * pi)
+        self.beta = self.alpha / (2 * self.x0 ** 2)
+
+        self.random_idx = -1
+
+    def forward(self):
+        # Reset the location to a box around the center
+        bound = 15
+        self.location.data[self.location.data > bound] = bound
+        self.location.data[self.location.data < -bound] = -bound
+
+        x = self.location[0]
+        y = self.location[1]
+        curvy = (y - x.sin()) ** 2
+        bounding = (self.beta * x ** 4 - self.alpha * x ** 2) / (self.alpha ** 2 / (4 * self.beta)) + 1
+        return curvy + bounding
+
+    def initialise_randomly(self):
+        self.random_idx += 1
+        self.random_idx %= 2
+        self.location.data[:] = torch.rand(2) * 2
+        if self.random_idx == 0:
+            self.location.data[0] -= self.x0
+        else:
+            self.location.data[0] += self.x0

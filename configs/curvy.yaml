@@ -1,0 +1,39 @@
+architecture:
+  name: CurvyValley
+device: cpu
+
+# Minimisation
+minima_count: 3
+minimum:
+  nsteps: 1000
+  algorithm:
+    name: SGD
+    lr: 0.01
+
+# Landscape exploration
+exploration:
+  value_key: loss
+  weight_key: saddle_loss
+  suggest:
+    - unfinished
+    - disconnected
+    - mst
+  autoneb:
+    # The first cycle should contain all information, subsequent cycles only _differences_ from the previous
+    # 4 times 1000 steps with lr=0.01
+    - insert:
+        name: equal
+        count: 3
+      subsample_pivot_count: 1
+      spring_constant: inf
+      optim:
+        nsteps: 100
+        algorithm:
+          name: SGD
+          lr: 0.001
+    - insert:
+        name: highest
+        count: 2
+        key: dense_loss
+    - {} # same as previous
+    - {} # same as previous

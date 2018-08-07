@@ -13,7 +13,7 @@ from torch_autoneb.models.cnn import CNN
 from torch_autoneb.models.densenet import DenseNet
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.models.resnet import ResNet
-from torch_autoneb.models.simple import Eggcarton
+from torch_autoneb.models.simple import Eggcarton, CurvyValley
 
 
 class ModelInterface:
