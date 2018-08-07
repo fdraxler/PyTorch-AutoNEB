@@ -18,6 +18,15 @@ class SimpleEnergy(Module):
     def analyse(self):
         return {"loss": self.forward().item()}
 
+    def sample_on_grid(self, x_space, y_space):
+        z = torch.zeros(y_space.shape[0], x_space.shape[0])
+        for i, xi in enumerate(x_space):
+            for j, yj in enumerate(y_space):
+                self.location.data[:] = torch.Tensor((xi, yj))
+                z[j, i] = self.forward().item()
+        z -= z.min()
+        return z
+
 
 class Eggcarton(SimpleEnergy):
     def forward(self):
