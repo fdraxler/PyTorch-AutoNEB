@@ -1,6 +1,6 @@
 try:
     import matplotlib.pyplot as plt
-except:
+except ModuleNotFoundError:
     pass
 import networkx as nx
 

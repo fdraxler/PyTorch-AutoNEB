@@ -4,8 +4,9 @@ from torch import FloatTensor, LongTensor, from_numpy
 from torch.autograd import Variable
 from torch.nn import Parameter, Module
 from torch.nn.functional import softmax, nll_loss, log_softmax
-
+from functools import reduce
 from torch_autoneb.helpers import pbar
+from operator import mul
 
 
 class NetworkInputModel(Module):
@@ -34,14 +35,14 @@ class NetworkInputModel(Module):
     def initialise_randomly(self):
         raise NotImplementedError("You need to manually prepare a set of minima, have a look at torch_autoneb.models.network_input.NetworkInputModel.generate_dataset()")
 
-    def generate_dataset(self, dataset, valid_set_size=50, adversarial_set_size=50):
+    def generate_dataset(self, dataset, number_of_classes, valid_set_size=50, adversarial_set_size=50):
         final_set = []
         adversarial_set = []
         base_model = self.base_model
 
         # Setup for adversarial samples
         base_model.eval()
-        fool_model = foolbox.models.PyTorchModel(base_model, (0, 1), dataset.get_number_of_classes())
+        fool_model = foolbox.models.PyTorchModel(base_model, (0, 1), number_of_classes, cuda=self.input_holder.device.type == "cuda")
         criterion = foolbox.criteria.TargetClassProbability(self.label, p=0.99)
         attack = foolbox.attacks.LBFGSAttack(fool_model, criterion)
 
@@ -50,7 +51,7 @@ class NetworkInputModel(Module):
             if target == self.label:
                 if len(final_set) < valid_set_size:
                     # Analyse the current image
-                    self.input_holder.data[:] = data.view(-1)
+                    self.input_holder.data[:] = data.view(self.input_holder.shape)
                     user_data = self.analyse()
                     final_set.append((data, user_data))
             else:
@@ -58,11 +59,11 @@ class NetworkInputModel(Module):
                     # Generate an adversarial
                     adversarial = attack(data.numpy(), label=target)
                     # Skip failed attempts
-                    if np.count_nonzero(adversarial == data.numpy()) == 3 * 32 * 32:
+                    if np.count_nonzero(adversarial == data.numpy()) == reduce(mul, data.shape):
                         print("Failed to generate an adversarial example")
                         continue
 
-                    data = from_numpy(adversarial).view(-1)
+                    data = from_numpy(adversarial).view(self.input_holder.shape)
                     self.input_holder.data[:] = data
                     user_data = self.analyse()
                     user_data.update({
@@ -113,7 +114,7 @@ class NetworkInputModel(Module):
             "softmax": softmax(soft_pred, 1).data.cpu(),
             "softmax_correct": softmax(soft_pred, 1).data[:, self.label].cpu()[0],
             "softmax_correct_inverse": 1 - softmax(soft_pred, 1).data[:, self.label].cpu()[0],
-            "cross_entropy": nll_loss(log_softmax(soft_pred, 1).cpu(), Variable(LongTensor([self.label]))).data[0],
+            "cross_entropy": nll_loss(log_softmax(soft_pred, 1).cpu(), Variable(LongTensor([self.label]))).item(),
             "argmax": hard_pred.cpu()[0, 0],
         }
         return analysis

@@ -19,6 +19,7 @@ from torch_autoneb.datasets import XORDataset
 from torch_autoneb.fill import equal, highest
 from torch_autoneb.models import CompareModel, DataModel, ModelWrapper, CNN, DenseNet, ResNet, Eggcarton
 from torch_autoneb.models.mlp import MLP
+from torch_autoneb.models.network_input import NetworkInputModel
 from torch_autoneb.suggest import disconnected, unfinished, mst
 
 
@@ -269,6 +270,28 @@ class LimitTest(TestCase):
             "path_coords": torch.cat([m["coords"].view(1, -1) for m in minima]),
             "target_distances": torch.ones(1)
         }, model, neb_config)
+
+
+class InputModelTest(TestCase):
+    def test_dataset_generation(self):
+        transform = Compose([Pad(2), ToTensor()])
+        train_mnist = MNIST(join(dirname(__file__), "tmp/mnist"), True, transform, download=True)
+        input_size = train_mnist[0][0].shape
+        number_of_classes = 10
+        resnet = ResNet(20, input_size, number_of_classes)
+
+        # Find a minimiser for the network
+        optim_wrapper = ModelWrapper(DataModel(CompareModel(resnet, NLLLoss()), {"train": train_mnist}))
+        optim_wrapper.to("cuda")
+        optim_config = OptimConfig(100, SGD, {"lr": 0.1}, None, None, EvalConfig(128))
+        minimum = find_minimum(optim_wrapper, optim_config)
+        optim_wrapper.set_coords_no_grad(minimum["coords"])
+
+        nim = NetworkInputModel(resnet, input_size, 0)
+        nim.cuda()
+        resnet.cuda()
+        dataset = nim.generate_dataset(train_mnist, number_of_classes)
+        self.assertEqual(len(dataset), 100)
 
 
 if __name__ == '__main__':
