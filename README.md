@@ -23,7 +23,17 @@ They can be applied on MNIST, CIFAR10 and CIFAR100.
 
 ## Installation
 
-### Running the examples
+Setup your environment, e.g. using
+
+```
+conda install pytorch torchvision -c pytorch
+```
+
+Optional, but recommended: Install `tqdm` top geht progress bars while running:
+
+```
+conda install tqdm
+```
 
 Download/Clone the code using
 
@@ -32,7 +42,9 @@ git clone https://github.com/fdraxler/PyTorch-AutoNEB
 cd PyTorch-AutoNEB
 ```
 
-and run
+## Usage
+
+### Running the examples
 
 ```
 python main.py project_directory config_file
