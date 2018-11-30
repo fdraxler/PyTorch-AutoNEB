@@ -69,3 +69,9 @@ in the root directory of this repository. You can then use it in Python via
 ```python
 import torch_autoneb
 ```
+
+
+## Results
+
+The final MSTs for analysis with [Evaluate.ipynb] can be found at [https://drive.google.com/drive/folders/1VQvecH3lWntBD5H0VHyYU577DunvkQlb](this repository).
+As of now, it contains only a subset of systems. [https://github.com/fdraxler/PyTorch-AutoNEB/issues/new](Open an issue) to request more systems.
