@@ -56,6 +56,7 @@ class CurvyValley(SimpleEnergy):
         y = self.location[1]
         curvy = (y - x.sin()) ** 2
         bounding = (self.beta * x ** 4 - self.alpha * x ** 2) / (self.alpha ** 2 / (4 * self.beta)) + 1
+
         return curvy + bounding
 
     def initialise_randomly(self):
@@ -66,3 +67,22 @@ class CurvyValley(SimpleEnergy):
             self.location.data[0] -= self.x0
         else:
             self.location.data[0] += self.x0
+
+
+class Flat(SimpleEnergy):
+    def __init__(self):
+        super().__init__()
+
+        self.register_buffer("iterated_buffer", torch.tensor(0.0))
+        self.random_idx = -1
+
+    def forward(self):
+        if self.training:
+            self.iterated_buffer += 1
+        return (self.location.sum()) * 0
+
+    def initialise_randomly(self):
+        self.random_idx += 1
+        self.random_idx %= 2
+        self.location.data[:] = torch.tensor([0, self.random_idx])
+        self.iterated_buffer[0] = 0

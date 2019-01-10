@@ -1,11 +1,11 @@
 architecture:
-  name: CurvyValley
+  name: Flat
 device: cpu
 
 # Minimisation
 minima_count: 2
 minimum:
-  nsteps: 1000
+  nsteps: 0
   algorithm:
     name: SGD
     lr: 0.01
@@ -25,15 +25,9 @@ exploration:
         name: equal
         count: 3
       subsample_pivot_count: 1
-      spring_constant: inf
+      spring_constant: 1e-9
       optim:
-        nsteps: 100
+        nsteps: 10
         algorithm:
           name: SGD
           lr: 0.001
-    - insert:
-        name: highest
-        count: 2
-        key: dense_loss
-    - {} # same as previous
-    - {} # same as previous

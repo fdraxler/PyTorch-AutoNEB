@@ -26,6 +26,7 @@ They can be applied on MNIST, CIFAR10 and CIFAR100.
 Setup your environment, e.g. using
 
 ```
+conda install pyyaml
 conda install pytorch torchvision -c pytorch
 ```
 
@@ -73,5 +74,5 @@ import torch_autoneb
 
 ## Results
 
-The final MSTs for analysis with [Evaluate.ipynb] can be found at [https://drive.google.com/drive/folders/1VQvecH3lWntBD5H0VHyYU577DunvkQlb](this repository).
-As of now, it contains only a subset of systems. [https://github.com/fdraxler/PyTorch-AutoNEB/issues/new](Open an issue) to request more systems.
+The final MSTs for analysis with [Evaluate.ipynb](Evaluate.ipynb) can be found at [this repository](https://drive.google.com/drive/folders/1VQvecH3lWntBD5H0VHyYU577DunvkQlb).
+As of now, it contains only a subset of systems. [Open an issue](https://github.com/fdraxler/PyTorch-AutoNEB/issues/new) to request more systems.

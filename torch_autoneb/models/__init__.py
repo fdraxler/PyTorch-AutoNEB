@@ -13,7 +13,7 @@ from torch_autoneb.models.cnn import CNN
 from torch_autoneb.models.densenet import DenseNet
 from torch_autoneb.models.mlp import MLP
 from torch_autoneb.models.resnet import ResNet
-from torch_autoneb.models.simple import Eggcarton, CurvyValley
+from torch_autoneb.models.simple import Eggcarton, CurvyValley, Flat
 
 
 class ModelInterface:
@@ -103,7 +103,7 @@ class ModelWrapper(ModelInterface):
             yield offset, data.data if not gradient else data.grad.data, size, False
             offset += size
         for buffer in self.stored_buffers:
-            size = reduce(operator.mul, buffer.shape)
+            size = reduce(operator.mul, buffer.shape, 1)
             yield offset, buffer if not gradient else None, size, True
             offset += size
 
@@ -118,7 +118,10 @@ class ModelWrapper(ModelInterface):
         final = 0
         for offset, data, size, is_buffer in self.iterate_params_buffers():
             # Copy coordinates
-            data[:] = self.coords[offset:offset + size].reshape(data.shape)
+            if len(data.shape) == 0:
+                data[0] = self.coords[offset:offset + size].item()
+            else:
+                data[:] = self.coords[offset:offset + size].reshape(data.shape)
 
             # Size consistency check
             final = final + size
