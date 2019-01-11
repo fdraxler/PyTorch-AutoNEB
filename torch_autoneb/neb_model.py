@@ -73,7 +73,7 @@ class NEB(models.ModelInterface):
         for i in range(npivots):
             self.model.set_coords_no_grad(self.path_coords[i])
             losses[i] = self.model.apply(gradient and (0 < i < npivots - 1))
-            if gradient and (0 < i < npivots):
+            if gradient and (0 < i < npivots - 1):
                 # If the coordinates were modified, move them back to the cache
                 self.model.get_coords(update_cache=True, target=self.path_coords[i])
                 self.model.get_grad(update_cache=True, target=self.path_coords.grad[i])
