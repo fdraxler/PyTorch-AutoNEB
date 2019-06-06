@@ -86,3 +86,19 @@ class Flat(SimpleEnergy):
         self.random_idx %= 2
         self.location.data[:] = torch.tensor([0, self.random_idx])
         self.iterated_buffer[0] = 0
+
+
+class Linear(SimpleEnergy):
+    def __init__(self):
+        super().__init__()
+        self.random_idx = -1
+
+    def forward(self):
+        x = self.location[0]
+        y = self.location[1]
+        return y
+
+    def initialise_randomly(self):
+        self.random_idx += 1
+        self.random_idx %= 2
+        self.location.data[:] = torch.tensor([self.random_idx, 0])
