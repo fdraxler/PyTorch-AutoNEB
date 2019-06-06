@@ -22,7 +22,7 @@ class NEB(models.ModelInterface):
         self.weight_decay = -1
 
     def get_device(self):
-        return self.path_coords.device
+        self.path_coords.device
 
     def to(self, *args, **kwargs):
         self.model.to(*args, **kwargs)
@@ -102,7 +102,7 @@ class NEB(models.ModelInterface):
                 assert self.spring_constant > 0
                 if self.spring_constant < float("inf"):
                     # Spring force parallel to tangent
-                    self.path_coords.grad[i] += (d_prev - td_prev) - (d_next - td_next) * self.spring_constant * tangent
+                    self.path_coords.grad[i] += ((d_prev - td_prev) - (d_next - td_next)) * self.spring_constant * tangent
 
         return losses.max().item()
 
@@ -113,12 +113,11 @@ class NEB(models.ModelInterface):
             t_next = (self.path_coords[i + 1] - self.path_coords[i]) / d_next
             l_max = max(abs(loss - l_prev), abs(loss - l_next))
             l_min = min(abs(loss - l_prev), abs(loss - l_next))
-            l_max /= l_max + l_min
-            l_min /= l_max + l_min
             if l_prev > l_next:
-                return l_min * t_prev + l_max * t_next
+                tangent = l_min * t_prev + l_max * t_next
             else:
-                return l_max * t_prev + l_min * t_next
+                tangent = l_max * t_prev + l_min * t_next
+            return tangent / (tangent.norm() + 1e-30)
         elif l_prev > l_next:
             # Tangent to the previous
             return (self.path_coords[i] - self.path_coords[i - 1]) / d_prev
