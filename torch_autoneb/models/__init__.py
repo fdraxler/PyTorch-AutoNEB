@@ -73,12 +73,14 @@ class ModelWrapper(ModelInterface):
     def __init__(self, model: Module, parameters: Iterable[Parameter] = None, buffers: Iterable[Tensor] = None):
         super().__init__()
         self.model = model
-        if parameters is not None:
-            parameters = list(parameters)
-        self.stored_parameters = parameters
-        if buffers is not None:
-            buffers = list(buffers)
-        self.stored_buffers = buffers
+
+        if parameters is None:
+            parameters = model.parameters()
+        self.stored_parameters = list(parameters)
+        if buffers is None:
+            buffers = model.buffers()
+        self.stored_buffers = list(buffers)
+
         self.number_of_dimensions = sum(size for _, _, size, _ in self.iterate_params_buffers())
         device = self.stored_parameters[0].device
         self.coords = torch.empty(self.number_of_dimensions, dtype=torch.float32).to(device).zero_()
