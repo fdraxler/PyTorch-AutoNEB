@@ -1,11 +1,12 @@
 import operator
 from functools import reduce
 from math import sqrt
+from typing import Iterable
 
 import torch
 from torch import Tensor
 from torch import nn
-from torch.nn import Module
+from torch.nn import Module, Parameter
 from torch.utils.data import DataLoader
 
 from torch_autoneb.config import EvalConfig
@@ -66,15 +67,18 @@ def param_init(mod: Module):
 
 class ModelWrapper(ModelInterface):
     """
-    Wraps around models which should return a loss for a given input batch.
+    Wrapper around model. Inner model should handle data loading and return a value to be minimized.
     """
 
-    def __init__(self, model: Module):
+    def __init__(self, model: Module, parameters: Iterable[Parameter] = None, buffers: Iterable[Tensor] = None):
         super().__init__()
         self.model = model
-        self.stored_parameters = list(self.model.parameters())
-        # noinspection PyProtectedMember
-        self.stored_buffers = list(self.model._all_buffers())
+        if parameters is not None:
+            parameters = list(parameters)
+        self.stored_parameters = parameters
+        if buffers is not None:
+            buffers = list(buffers)
+        self.stored_buffers = buffers
         self.number_of_dimensions = sum(size for _, _, size, _ in self.iterate_params_buffers())
         device = self.stored_parameters[0].device
         self.coords = torch.empty(self.number_of_dimensions, dtype=torch.float32).to(device).zero_()
@@ -86,7 +90,7 @@ class ModelWrapper(ModelInterface):
     def to(self, *args, **kwargs):
         self.model.to(*args, **kwargs)
         # noinspection PyProtectedMember
-        self.stored_buffers = list(self.model._all_buffers())
+        self.stored_buffers = list(self.model.buffers())
         self._check_device()
 
     def parameters(self):
