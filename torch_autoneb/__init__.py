@@ -36,9 +36,9 @@ def find_minimum(model: models.ModelWrapper, optim_config: config.OptimConfig) -
     # Optimise
     for _ in helper.pbar(range(optim_config.nsteps), "Find mimimum"):
         model.apply(gradient=True)
+        optimiser.step()
         if scheduler is not None:
             scheduler.step()
-        optimiser.step()
         # todo tensorboard logging or similar
     result = {
         "coords": model.get_coords().to("cpu"),
@@ -78,9 +78,9 @@ def neb(previous_cycle_data, model: models.ModelWrapper, neb_config: config.NEBC
     # Optimise
     for _ in helper.pbar(range(optim_config.nsteps), "NEB"):
         neb_mod.apply(gradient=True)
+        optimiser.step()
         if scheduler is not None:
             scheduler.step()
-        optimiser.step()
     result = {
         "path_coords": neb_mod.path_coords.clone().to("cpu"),
         "target_distances": target_distances.to("cpu")
