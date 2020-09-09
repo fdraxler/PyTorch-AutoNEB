@@ -10,10 +10,21 @@ def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
     nodelist = list(graph)
     edgelist = list(graph.edges)
 
+    cmap = plt.get_cmap("plasma")
+
     # Minima
     if pos is None:
         pos = nx.circular_layout(graph)
-    nx.draw_networkx_nodes(graph, pos, nodelist, node_color="k")
+    if value_key is None:
+        node_colour = "k"
+        vmin = None
+        vmax = None
+    else:
+        node_colour = [graph.nodes(m)[value_key] for m in nodelist]
+        vmin = min(node_colour)
+        vmax = max(node_colour)
+    nx.draw_networkx_nodes(graph, pos, nodelist, node_color=node_colour,
+                           cmap=cmap, vmin=vmin, vmax=vmax)
     nx.draw_networkx_labels(graph, pos, font_color="w")
 
     # Edges
@@ -21,7 +32,6 @@ def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
         edgecolours = [graph.get_edge_data(*e)[weight_key] for e in edgelist]
         vmin = min(edgecolours)
         vmax = max(edgecolours)
-        cmap = plt.get_cmap("plasma")
         nx.draw_networkx_edges(graph, pos, edgelist, 4, edgecolours,
                                edge_cmap=cmap, edge_vmin=vmin, edge_vmax=vmax)
 
@@ -37,7 +47,7 @@ def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
 def plot_dense(dense_data, pivot_distances, normed_length=False):
     x = x_for_dense(dense_data, pivot_distances, normed_length)
     line, = plt.plot(x.numpy(), dense_data.numpy())
-    
+
     chain_count = pivot_distances.shape[0] + 1
     total_count = dense_data.shape[0]
     sub_image_count = (total_count - 1) // (chain_count - 1) - 1
@@ -51,7 +61,7 @@ def plot_dense(dense_data, pivot_distances, normed_length=False):
 def x_for_dense(data, distances, normed_length=False):
     cumsum = distances.cumsum(0)
     normed = distances.new(distances.shape[0] + 1).zero_()
-    normed[1:] = cumsum# / cumsum[-1]
+    normed[1:] = cumsum  # / cumsum[-1]
     chain_count = distances.shape[0] + 1
     total_count = data.shape[0]
     assert (total_count - 1) % (chain_count - 1) == 0, "Cannot compute sub-image-count"

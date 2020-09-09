@@ -51,6 +51,7 @@ def repair_graph(graph, model):
             if value is None:
                 found_none = True
         if found_none:
+            model.set_coords_no_grad(graph.nodes[m]["coords"])
             graph.nodes[m].update(model.analyse())
     return graph
 
