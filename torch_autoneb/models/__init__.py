@@ -243,9 +243,9 @@ class ModelWrapper(ModelInterface):
 
 
 def ensure_data_loader(data_provider: [Dataset, DataLoader], **kwargs) -> DataLoader:
-    if isinstance(data_provider, DataLoader):
-        return data_provider
-    return DataLoader(data_provider, **kwargs)
+    if isinstance(data_provider, Dataset):
+        return DataLoader(data_provider, **kwargs)
+    return data_provider
 
 
 class DataModel(Module):
