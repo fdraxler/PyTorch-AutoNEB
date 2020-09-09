@@ -20,7 +20,7 @@ def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
         vmin = None
         vmax = None
     else:
-        node_colour = [graph.nodes(m)[value_key] for m in nodelist]
+        node_colour = [graph.nodes[m][value_key] for m in nodelist]
         vmin = min(node_colour)
         vmax = max(node_colour)
     nx.draw_networkx_nodes(graph, pos, nodelist, node_color=node_colour,
