@@ -1,14 +1,13 @@
 import operator
 from functools import reduce
 from math import sqrt
-from typing import Iterable
+from typing import Iterable, Dict, Union
 
 import torch
 from torch import Tensor
 from torch import nn
 from torch.nn import Module, Parameter
-from torch.utils.data import DataLoader
-
+from torch.utils.data import DataLoader, Dataset
 from torch_autoneb.config import EvalConfig
 from torch_autoneb.models.cnn import CNN
 from torch_autoneb.models.densenet import DenseNet
@@ -243,8 +242,14 @@ class ModelWrapper(ModelInterface):
             return self.model.analyse()
 
 
+def ensure_data_loader(data_provider: [Dataset, DataLoader], **kwargs) -> DataLoader:
+    if isinstance(data_provider, DataLoader):
+        return data_provider
+    return DataLoader(data_provider, **kwargs)
+
+
 class DataModel(Module):
-    def __init__(self, model: Module, datasets: dict):
+    def __init__(self, model: Module, datasets: Dict[str, Union[Dataset, DataLoader]]):
         super().__init__()
 
         self.batch_size = None
@@ -266,7 +271,7 @@ class DataModel(Module):
             # Make sure that there is a non-empty iterator
             if dataset not in self.dataset_iters:
                 if dataset not in self.dataset_loaders:
-                    self.dataset_loaders[dataset] = DataLoader(self.datasets[dataset], self.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=4)
+                    self.dataset_loaders[dataset] = ensure_data_loader(self.datasets[dataset], batch_size=self.batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=4)
                 loader = self.dataset_loaders[dataset]
                 self.dataset_iters[dataset] = iter(loader)
             iterator = self.dataset_iters[dataset]
@@ -290,7 +295,7 @@ class DataModel(Module):
         analysis = {}
         for ds_name, dataset in self.datasets.items():
             ds_length = len(dataset)
-            for batch in DataLoader(dataset, self.batch_size):
+            for batch in ensure_data_loader(dataset, batch_size=self.batch_size):
                 batch = self.batch_to_device(batch)
                 result = self.model.analyse(*batch)
                 for key, value in result.items():
