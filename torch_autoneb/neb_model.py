@@ -125,10 +125,7 @@ class NEB(models.ModelInterface):
             # Tangent to the next
             return (self.path_coords[i + 1] - self.path_coords[i]) / d_next
 
-    def analyse(self, sub_pivot_count=9):
-        # Collect stats here
-        analysis = {}
-
+    def iterate_densely(self, sub_pivot_count=9):
         dense_pivot_count = (self.path_coords.shape[0] - 1) * (sub_pivot_count + 1) + 1
         alphas = linspace(0, 1, sub_pivot_count + 2)[:-1].to(self.path_coords.device)
         for i in helpers.pbar(range(dense_pivot_count), "Saddle analysis"):
@@ -145,6 +142,14 @@ class NEB(models.ModelInterface):
 
             # Retrieve values from model analysis
             self.model.set_coords_no_grad(coords)
+            yield i
+
+    def analyse(self, sub_pivot_count=9):
+        # Collect stats here
+        analysis = {}
+
+        dense_pivot_count = (self.path_coords.shape[0] - 1) * (sub_pivot_count + 1) + 1
+        for i in self.iterate_densely(sub_pivot_count):
             point_analysis = self.model.analyse()
             for key, value in point_analysis.items():
                 dense_key = "dense_" + key

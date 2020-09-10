@@ -15,9 +15,10 @@ def replace_instanciation(config, package):
         return getattr(package, name), config
     elif config is None:
         return None, None
-    else:
+    elif isinstance(config, str):
         # Just the name
         return getattr(package, config), {}
+    return config, {}
 
 
 def _deep_update(source: dict, target: dict):
