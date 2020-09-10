@@ -125,7 +125,7 @@ class Cluster:
         return self.dist
 
 
-def plot_disconnectivity_graph(graph, value_key, weight_key):
+def draw_disconnectivity_graph(graph, value_key, weight_key):
     simple_graph = ta.to_simple_graph(graph, weight_key)
     mst = nx.minimum_spanning_tree(simple_graph, weight_key)
 
