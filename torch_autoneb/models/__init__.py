@@ -57,6 +57,8 @@ def param_init(mod: Module):
         mod.reset_parameters()
     elif hasattr(mod, "initialise_randomly"):
         mod.initialise_randomly()
+    elif hasattr(mod, "init_params"):
+        mod.init_params()
     elif len(mod._parameters) == 0:
         # Module has no parameters on its own
         pass
