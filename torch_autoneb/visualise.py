@@ -95,10 +95,10 @@ class Leaf:
 
 
 class Cluster:
-    def __init__(self, cluster_a: Union["Cluster", Leaf], cluster_b: Union["Cluster", Leaf], dist):
+    def __init__(self, cluster_a: Union["Cluster", Leaf], cluster_b: Union["Cluster", Leaf], value):
         self.cluster_a = cluster_a
         self.cluster_b = cluster_b
-        self.dist = dist
+        self.value = value
         self.width = cluster_a.width + cluster_b.width + 1
 
     def plot(self, center):
