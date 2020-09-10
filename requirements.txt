@@ -3,3 +3,7 @@ networkx
 torch
 pyyaml
 numpy
+yaml
+tqdm
+matplotlib
+scipy

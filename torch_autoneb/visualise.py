@@ -116,13 +116,11 @@ class Cluster:
 
         trajectory = np.array([
             [center_a, value_a],
-            [center_a, self.dist],
-            [center_b, self.dist],
+            [center_a, self.value],
+            [center_b, self.value],
             [center_b, value_b]
         ])
         plt.plot(trajectory[:, 0], trajectory[:, 1], "k-", lw=1)
-
-        return self.dist
 
 
 def draw_disconnectivity_graph(graph, value_key, weight_key):
