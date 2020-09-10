@@ -22,7 +22,7 @@ class NEB(models.ModelInterface):
         self.weight_decay = -1
 
     def get_device(self):
-        self.path_coords.device
+        return self.path_coords.device
 
     def to(self, *args, **kwargs):
         self.model.to(*args, **kwargs)

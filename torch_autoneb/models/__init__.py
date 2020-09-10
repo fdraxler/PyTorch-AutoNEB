@@ -242,9 +242,10 @@ class ModelWrapper(ModelInterface):
             return self.model.analyse()
 
 
-def ensure_data_loader(data_provider: [Dataset, DataLoader], **kwargs) -> DataLoader:
+def ensure_data_loader(data_provider: [Dataset, DataLoader], batch_size, **kwargs) -> DataLoader:
     if isinstance(data_provider, Dataset):
-        return DataLoader(data_provider, **kwargs)
+        return DataLoader(data_provider, batch_size=batch_size, **kwargs)
+    data_provider.batch_size = batch_size
     return data_provider
 
 
@@ -261,6 +262,7 @@ class DataModel(Module):
 
     def adapt_to_config(self, config: EvalConfig):
         self.batch_size = config.batch_size
+        self.dataset_loaders = {}
         self.dataset_iters = {}
         if hasattr(self.model, "adapt_to_config"):
             self.model.adapt_to_config(config)

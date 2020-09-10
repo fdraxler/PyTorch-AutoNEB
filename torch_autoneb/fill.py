@@ -79,7 +79,6 @@ def highest(previous_cycle_data: dict, count: int, key: str, threshold=0.1):
             fill.append([])
 
     a, b = fill_chain(path_coords, fill, weights)
-    print(path_coords.shape[0], "+", count, "=", a.shape[0])
     return a, b
 
 
