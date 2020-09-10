@@ -2,3 +2,4 @@ torchvision
 networkx
 torch
 pyyaml
+numpy

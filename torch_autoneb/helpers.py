@@ -1,7 +1,7 @@
+import collections
 import logging
 from itertools import repeat
 
-import collections
 from torch import Tensor
 
 try:

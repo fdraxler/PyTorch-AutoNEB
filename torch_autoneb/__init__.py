@@ -3,6 +3,7 @@ import os
 import pickle
 from logging import getLogger
 
+import networkx as nx
 import torch
 from networkx import MultiGraph, Graph, minimum_spanning_tree
 from torch import optim
@@ -203,3 +204,11 @@ def store_pickle_graph(graph: MultiGraph, graph_file_name: str):
 
     # Then overwrite the old file
     os.rename(os.path.join(directory, "~" + filename), graph_file_name)
+
+
+def topographic_distance(mst, node_a, node_b, weight_key: str):
+    dist = 0
+    path = nx.shortest_path(mst, node_a, node_b)
+    for a, b in zip(path[:-1], path[1:]):
+        dist = max(mst[a][b][weight_key], dist)
+    return dist

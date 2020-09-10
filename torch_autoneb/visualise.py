@@ -1,8 +1,15 @@
+from typing import List, Union
+
+import torch_autoneb as ta
+from scipy.cluster.hierarchy import linkage
+from scipy.spatial.distance import squareform
+
 try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     pass
 import networkx as nx
+import numpy as np
 
 
 def draw_connectivity_graph(graph, value_key, weight_key, pos=None):
@@ -75,3 +82,62 @@ def x_for_dense(data, distances, normed_length=False):
     if normed_length:
         sub_normed /= sub_normed[-1]
     return sub_normed
+
+
+class Leaf:
+    def __init__(self, m_idx, value):
+        self.m_idx = m_idx
+        self.value = value
+        self.width = 1
+
+    def plot(self, center):
+        plt.plot(center, self.value, ".k", zorder=3)
+
+
+class Cluster:
+    def __init__(self, cluster_a: Union["Cluster", Leaf], cluster_b: Union["Cluster", Leaf], dist):
+        self.cluster_a = cluster_a
+        self.cluster_b = cluster_b
+        self.dist = dist
+        self.width = cluster_a.width + cluster_b.width + 1
+
+    def plot(self, center):
+        width_a = self.cluster_a.width
+        width_b = self.cluster_b.width
+
+        center_a = center - self.width / 2 + width_a / 2
+        center_b = center + self.width / 2 - width_b / 2
+
+        self.cluster_a.plot(center_a)
+        self.cluster_b.plot(center_b)
+
+        value_a = self.cluster_a.value
+        value_b = self.cluster_b.value
+
+        trajectory = np.array([
+            [center_a, value_a],
+            [center_a, self.dist],
+            [center_b, self.dist],
+            [center_b, value_b]
+        ])
+        plt.plot(trajectory[:, 0], trajectory[:, 1], "k-", lw=1)
+
+        return self.dist
+
+
+def plot_disconnectivity_graph(graph, value_key, weight_key):
+    simple_graph = ta.to_simple_graph(graph, weight_key)
+    mst = nx.minimum_spanning_tree(simple_graph, weight_key)
+
+    dist = np.zeros([len(graph.nodes)] * 2)
+    for i, mi in enumerate(mst.nodes):
+        for j, mj in enumerate(mst.nodes):
+            dist[i, j] = ta.topographic_distance(mst, mi, mj, weight_key)
+    pdist = squareform(dist, checks=False)
+
+    link_info = linkage(pdist, optimal_ordering=True)
+    clusters: List[Union[Leaf, Cluster]] = [Leaf(m, mst.nodes[m][value_key]) for m in mst]
+    for c1, c2, d12, _ in link_info:
+        clusters.append(Cluster(clusters[int(c1)], clusters[int(c2)], d12))
+    clusters[-1].plot(0)
+    plt.yscale("log")
