@@ -1,5 +1,6 @@
 import operator
-from collections import Iterable, OrderedDict
+from collections import OrderedDict
+from typing import Iterable
 from functools import reduce
 
 from torch.nn import Sequential, Linear, ReLU, BatchNorm1d, Dropout, Module
