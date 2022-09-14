@@ -126,7 +126,7 @@ class ModelWrapper(ModelInterface):
         for offset, data, size, is_buffer in self.iterate_params_buffers():
             # Copy coordinates
             if len(data.shape) == 0:
-                data[0] = self.coords[offset:offset + size].item()
+                data.fill_(self.coords[offset:offset + size][0])
             else:
                 data[:] = self.coords[offset:offset + size].reshape(data.shape)
 
